@@ -1,0 +1,8 @@
+{
+  "name": "Arreglados 🔧 2.0",
+  "description": "Marketplace de servicios para el hogar en Argentina con IA de soporte integrada.",
+  "requestFramePermissions": [
+    "geolocation",
+    "camera"
+  ]
+}
