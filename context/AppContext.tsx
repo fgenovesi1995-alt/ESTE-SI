@@ -63,28 +63,39 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   }, [state.currentUser?.id]);
 
-  const fetchProfile = async (userId: string) => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
+  const fetchProfile = async (userId: string): Promise<User | null> => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
 
-    if (data) {
-      // Map DB profile to User type
-      const user: User = {
-        id: data.id,
-        name: data.first_name || '',
-        lastName: data.last_name || '',
-        dni: data.dni || '',
-        photo: data.photo || 'https://picsum.photos/seed/user/200',
-        role: data.role as Role,
-        email: data.email || '',
-        cards: [], // Cards not persisted in this demo
-        location: data.location
-      };
-      setState(prev => ({ ...prev, currentUser: user, isProMode: user.role === 'pro' }));
+      if (error) {
+        console.error("Error fetching profile:", error);
+        return null;
+      }
+
+      if (data) {
+        // Map DB profile to User type
+        const user: User = {
+          id: data.id,
+          name: data.first_name || '',
+          lastName: data.last_name || '',
+          dni: data.dni || '',
+          photo: data.photo || 'https://picsum.photos/seed/user/200',
+          role: (data.role as Role) || 'user',
+          email: data.email || '',
+          cards: [], // Cards not persisted in this demo
+          location: data.location
+        };
+        setState(prev => ({ ...prev, currentUser: user, isProMode: user.role === 'pro' }));
+        return user;
+      }
+    } catch (e) {
+      console.error("Profile fetch exception:", e);
     }
+    return null;
   };
 
   const fetchProfessionals = async () => {
@@ -165,14 +176,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const login = async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
+
     // Explicitly fetch profile to ensure state updates immediately before redirect
     if (data.session?.user) {
-      await fetchProfile(data.session.user.id);
+      const user = await fetchProfile(data.session.user.id);
+      if (!user) {
+        throw new Error("Perfil de usuario no encontrado. Contacta soporte.");
+      }
     }
   };
 
   const register = async (email: string, password: string, role: Role, name: string) => {
-    const { error } = await supabase.auth.signUp({
+    const { error, data } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -182,12 +197,35 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
       }
     });
+
     if (error) throw error;
 
     // Check if session exists (auto-login often happens on sign up in Supabase dev)
-    const { data: { session } } = await supabase.auth.getSession();
+    // If returning user but allows sign up (sometimes happens), check session
+    const session = data.session;
     if (session?.user) {
-      await fetchProfile(session.user.id);
+      // Small delay to allow trigger to run?
+      await new Promise(r => setTimeout(r, 1000));
+      const user = await fetchProfile(session.user.id);
+      // If trigger failed / hasn't run, we might need to manually insert?
+      // For now, let's just warn or let it fail?
+      // Better: if profile missing, create it here manually as fallback to trigger
+      if (!user) {
+        // Fallback create profile
+        const { error: profileError } = await supabase.from('profiles').insert({
+          id: session.user.id,
+          email: session.user.email,
+          first_name: name,
+          role: role,
+          created_at: new Date().toISOString()
+        });
+
+        if (!profileError) {
+          await fetchProfile(session.user.id);
+        } else {
+          throw new Error("Error creando perfil de usuario: " + profileError.message);
+        }
+      }
     }
   };
 
