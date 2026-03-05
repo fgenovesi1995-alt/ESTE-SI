@@ -80,7 +80,7 @@ const ProDashboard: React.FC = () => {
                     </div>
                     <p className="text-[9px] text-gray-400">Hace 5 min</p>
                   </div>
-                  
+
                   <p className="text-xs text-gray-600 dark:text-gray-300 mb-4 line-clamp-2">
                     {task.description}
                   </p>
@@ -89,8 +89,14 @@ const ProDashboard: React.FC = () => {
                     <img src={task.photo} className="w-full h-32 object-cover rounded-2xl mb-4" alt="Tarea" />
                   )}
 
-                  <button 
-                    onClick={() => applyToTask(task.id)}
+                  <button
+                    onClick={async () => {
+                      try {
+                        await applyToTask(task.id);
+                      } catch (err: any) {
+                        alert("Error al postularte: " + err.message);
+                      }
+                    }}
                     className="w-full bg-emerald-600 text-white font-bold py-3 rounded-xl active:scale-95 transition-all flex items-center justify-center gap-2"
                   >
                     <span className="material-symbols-outlined text-sm">check_circle</span>

@@ -2,7 +2,6 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import Header from '../components/Header';
 import BottomNav from '../components/BottomNav';
 
 const ProfessionalList: React.FC<{ isPremiumOnly?: boolean }> = ({ isPremiumOnly = false }) => {
@@ -22,33 +21,30 @@ const ProfessionalList: React.FC<{ isPremiumOnly?: boolean }> = ({ isPremiumOnly
 
   return (
     <div className="min-h-screen bg-background-light dark:bg-background-dark pb-24">
-      <Header />
-      
+      <header className="p-6 pt-[env(safe-area-inset-top,24px)] bg-white dark:bg-surface-dark border-b border-gray-100 dark:border-gray-800 flex items-center gap-4">
+        <button onClick={() => navigate(-1)} className="p-1 -ml-2">
+          <span className="material-symbols-outlined">arrow_back</span>
+        </button>
+        <h1 className="text-2xl font-bold flex-1">
+          {isPremiumOnly ? 'Premium' : (categoryId ? categoryId.charAt(0).toUpperCase() + categoryId.slice(1) : 'Profesionales')}
+        </h1>
+      </header>
+
       <main className="p-4">
-        <div className="flex items-center gap-3 mb-6">
-          <button onClick={() => navigate(-1)} className="p-2 bg-white dark:bg-surface-dark rounded-xl shadow-sm">
-            <span className="material-symbols-outlined">arrow_back</span>
-          </button>
-          <h1 className="text-xl font-bold">
-            {isPremiumOnly ? 'Premium' : categoryId || 'Profesionales'}
-          </h1>
-        </div>
 
         {/* Filters */}
         <div className="flex gap-2 mb-6 overflow-x-auto no-scrollbar">
-          <button 
+          <button
             onClick={() => setSortBy('rating')}
-            className={`flex-shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-              sortBy === 'rating' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'bg-white dark:bg-surface-dark text-gray-500'
-            }`}
+            className={`flex-shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition-all ${sortBy === 'rating' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'bg-white dark:bg-surface-dark text-gray-500'
+              }`}
           >
             Mejor Puntaje
           </button>
-          <button 
+          <button
             onClick={() => setSortBy('price')}
-            className={`flex-shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-              sortBy === 'price' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'bg-white dark:bg-surface-dark text-gray-500'
-            }`}
+            className={`flex-shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition-all ${sortBy === 'price' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'bg-white dark:bg-surface-dark text-gray-500'
+              }`}
           >
             Menor Precio
           </button>
@@ -56,8 +52,8 @@ const ProfessionalList: React.FC<{ isPremiumOnly?: boolean }> = ({ isPremiumOnly
 
         <div className="space-y-4">
           {filteredPros.map(pro => (
-            <div 
-              key={pro.id} 
+            <div
+              key={pro.id}
               onClick={() => navigate(`/chat/${pro.id}`)}
               className="bg-white dark:bg-surface-dark p-4 rounded-3xl shadow-md border border-gray-50 dark:border-gray-800 flex items-center gap-4 cursor-pointer active:scale-[0.98] transition-all"
             >

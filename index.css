@@ -2,6 +2,15 @@ body {
     font-family: 'Lexend', sans-serif;
     -webkit-font-smoothing: antialiased;
     overscroll-behavior-y: contain;
+    background-color: #f8fafc;
+    /* standard light bg */
+}
+
+:root {
+    --sat: env(safe-area-inset-top);
+    --sar: env(safe-area-inset-right);
+    --sab: env(safe-area-inset-bottom);
+    --sal: env(safe-area-inset-left);
 }
 
 .no-scrollbar::-webkit-scrollbar {
@@ -24,13 +33,26 @@ body {
 /* Mobile-first centered container */
 #root {
     max-width: 448px;
-    /* max-w-md */
     margin: 0 auto;
-    min-height: 100vh;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
     background-color: white;
     box-shadow: 0 0 50px rgba(0, 0, 0, 0.1);
+    position: relative;
+    /* allow sub-screens to handle overflow */
 }
 
 .dark #root {
     background-color: #101922;
+}
+
+/* Ensure categories and tags are always capitalized */
+.capitalize-first::first-letter {
+    text-transform: uppercase;
+}
+
+[class*="category"],
+[class*="tag"] {
+    text-transform: capitalize;
 }

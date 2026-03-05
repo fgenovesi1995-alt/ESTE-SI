@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Arreglados</string>
+    <string name="title_activity_main">Arreglados</string>
+    <string name="package_name">com.arreglados.app</string>
+    <string name="custom_url_scheme">com.arreglados.app</string>
+</resources>

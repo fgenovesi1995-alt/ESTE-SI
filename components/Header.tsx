@@ -9,17 +9,18 @@ const Header: React.FC = () => {
   const [showNotif, setShowNotif] = useState(false);
 
   return (
-    <header className="sticky top-0 z-50 bg-white/95 dark:bg-surface-dark/95 backdrop-blur-md border-b border-gray-100 dark:border-gray-800 px-4 py-3 flex items-center justify-between">
-      <div 
-        className="flex items-center gap-1 cursor-pointer"
-        onClick={() => navigate('/')}
+    <header className="bg-white dark:bg-surface-dark p-4 pt-[env(safe-area-inset-top,20px)] flex justify-between items-center border-b border-gray-100 dark:border-gray-800 shadow-sm transition-colors sticky top-0 z-50">
+      <div
+        className="flex items-center gap-2 cursor-pointer active:scale-95 transition-transform"
+        onClick={() => navigate('/home')}
       >
         <h1 className="text-xl font-bold text-primary">Arreglados</h1>
         <span className="text-lg">🔧</span>
+        <span className="text-[10px] font-bold text-gray-400 ml-1">v2.1.6</span>
       </div>
 
       <div className="flex items-center gap-3">
-        <button 
+        <button
           onClick={() => navigate('/map')}
           className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 transition-colors"
         >
@@ -27,7 +28,7 @@ const Header: React.FC = () => {
         </button>
 
         <div className="relative">
-          <button 
+          <button
             onClick={() => setShowNotif(!showNotif)}
             className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 transition-colors"
           >

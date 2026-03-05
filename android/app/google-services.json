@@ -1,0 +1,29 @@
+{
+    "project_info": {
+        "project_number": "341769997918",
+        "project_id": "arreglados",
+        "storage_bucket": "arreglados.firebasestorage.app"
+    },
+    "client": [
+        {
+            "client_info": {
+                "mobilesdk_app_id": "1:341769997918:android:0e36ab990ffff437aeeecf",
+                "android_client_info": {
+                    "package_name": "com.arreglados.genovesi.app"
+                }
+            },
+            "oauth_client": [],
+            "api_key": [
+                {
+                    "current_key": "AIzaSyB1DCWgjGY8Tz7049QBSgWQ5sFIUD98npY"
+                }
+            ],
+            "services": {
+                "appinvite_service": {
+                    "other_platform_oauth_client": []
+                }
+            }
+        }
+    ],
+    "configuration_version": "1"
+}

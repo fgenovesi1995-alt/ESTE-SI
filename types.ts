@@ -21,6 +21,7 @@ export interface User {
     lat: number;
     lng: number;
   };
+  pushToken?: string;
 }
 
 export interface Professional {
@@ -46,6 +47,10 @@ export interface Task {
   category: string;
   description: string;
   photo?: string;
+  location?: {
+    lat: number;
+    lng: number;
+  };
   status: 'pending' | 'accepted' | 'completed' | 'paid';
   createdAt: string;
 }
@@ -71,4 +76,5 @@ export interface AppState {
   professionals: Professional[];
   notifications: string[];
   isProMode: boolean;
+  isInitialized: boolean;
 }

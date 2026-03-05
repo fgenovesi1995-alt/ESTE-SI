@@ -1,10 +1,89 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import Header from '../components/Header';
 import BottomNav from '../components/BottomNav';
+import { GoogleMap, useJsApiLoader, MarkerF, Autocomplete } from '@react-google-maps/api';
+import { getGeocode, getLatLng } from 'use-places-autocomplete';
+import { GOOGLE_MAPS_LIBRARIES } from '../services/googleMaps';
+
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
 const CATEGORIES = ['Electricidad', 'Plomería', 'Pintura', 'Limpieza', 'Jardinería', 'Cerrajería', 'Mudanzas'];
+
+// Sub-component for the search logic to ensure hooks initialize only after script is loaded
+interface AddressSearchProps {
+  onSelect: (address: string) => void;
+  onMapClick: (lat: number, lng: number) => void;
+  location: { lat: number, lng: number } | null;
+}
+
+const AddressSearch: React.FC<AddressSearchProps> = ({ onSelect, onMapClick, location }) => {
+  const [autocomplete, setAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
+  const [inputValue, setInputValue] = useState('');
+
+  const onLoad = (autocompleteObj: google.maps.places.Autocomplete) => {
+    console.log("Autocomplete widget loaded");
+    setAutocomplete(autocompleteObj);
+  };
+
+  const onPlaceChanged = () => {
+    if (autocomplete !== null) {
+      const place = autocomplete.getPlace();
+      console.log("Place Selected:", place);
+
+      const address = place.formatted_address || place.name;
+      if (address) {
+        setInputValue(address);
+        onSelect(address);
+      }
+    } else {
+      console.log("Autocomplete is not loaded yet");
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="relative">
+        <Autocomplete
+          onLoad={onLoad}
+          onPlaceChanged={onPlaceChanged}
+          options={{
+            componentRestrictions: { country: "ar" },
+            fields: ["address_components", "geometry", "formatted_address", "name"]
+          }}
+        >
+          <input
+            type="text"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl p-3 text-xs focus:ring-2 focus:ring-primary shadow-inner"
+            placeholder="Busca tu dirección o barrio..."
+          />
+        </Autocomplete>
+      </div>
+
+      <div className="h-48 rounded-2xl overflow-hidden shadow-inner border border-gray-100 dark:border-gray-800">
+        <GoogleMap
+          mapContainerStyle={{ width: '100%', height: '100%' }}
+          center={location || { lat: -34.6037, lng: -58.3816 }}
+          zoom={location ? 16 : 12}
+          onClick={(e) => {
+            const lat = e.latLng?.lat();
+            const lng = e.latLng?.lng();
+            console.log("Map clicked at:", lat, lng);
+            if (lat && lng) onMapClick(lat, lng);
+          }}
+          options={{
+            disableDefaultUI: true,
+            styles: [{ featureType: "poi", stylers: [{ visibility: "off" }] }]
+          }}
+        >
+          {location && <MarkerF position={location} />}
+        </GoogleMap>
+      </div>
+    </div>
+  );
+};
 
 const CreateTask: React.FC = () => {
   const navigate = useNavigate();
@@ -14,15 +93,30 @@ const CreateTask: React.FC = () => {
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
   const [photo, setPhoto] = useState<string | null>(null);
+  const [location, setLocation] = useState<{ lat: number, lng: number } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const { isLoaded } = useJsApiLoader({
+    id: 'google-map-script',
+    googleMapsApiKey: GOOGLE_MAPS_API_KEY || '',
+    libraries: GOOGLE_MAPS_LIBRARIES,
+  });
+
+  const handleSelect = async (address: string) => {
+    try {
+      const results = await getGeocode({ address });
+      const { lat, lng } = await getLatLng(results[0]);
+      setLocation({ lat, lng });
+    } catch (error) {
+      console.error("Error fetching coordinates", error);
+    }
+  };
 
   const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setPhoto(reader.result as string);
-      };
+      reader.onloadend = () => setPhoto(reader.result as string);
       reader.readAsDataURL(file);
     }
   };
@@ -33,7 +127,7 @@ const CreateTask: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      await createTask(category, description, photo || undefined);
+      await createTask(category, description, photo || undefined, location || undefined);
       navigate('/tasks');
     } catch (error) {
       console.error(error);
@@ -43,11 +137,15 @@ const CreateTask: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background-light dark:bg-background-dark pb-24">
-      <Header />
+    <div className="h-full bg-background-light dark:bg-background-dark font-body flex flex-col overflow-hidden">
+      <header className="p-6 pt-[env(safe-area-inset-top,24px)] bg-white dark:bg-surface-dark border-b border-gray-100 dark:border-gray-800 flex items-center gap-4">
+        <button onClick={() => navigate('/home')} className="p-1 -ml-2">
+          <span className="material-symbols-outlined">arrow_back</span>
+        </button>
+        <h1 className="text-2xl font-bold flex-1 font-display">¿Qué necesitas?</h1>
+      </header>
 
-      <main className="p-6">
-        <h1 className="text-2xl font-bold mb-6">¿Qué necesitas?</h1>
+      <main className="flex-1 overflow-y-auto p-6 pb-32 no-scrollbar">
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-2">
@@ -59,8 +157,8 @@ const CreateTask: React.FC = () => {
                   type="button"
                   onClick={() => setCategory(cat)}
                   className={`py-3 px-4 rounded-xl text-sm font-semibold transition-all border-2 ${category === cat
-                      ? 'border-primary bg-primary/5 text-primary'
-                      : 'border-transparent bg-white dark:bg-surface-dark shadow-sm'
+                    ? 'border-primary bg-primary/5 text-primary'
+                    : 'border-transparent bg-white dark:bg-surface-dark shadow-sm'
                     }`}
                 >
                   {cat}
@@ -80,6 +178,7 @@ const CreateTask: React.FC = () => {
             />
           </div>
 
+          {/* Photo Section */}
           <div className="p-4 bg-white dark:bg-surface-dark rounded-2xl shadow-sm space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -92,14 +191,7 @@ const CreateTask: React.FC = () => {
             </div>
 
             <div className="flex gap-2">
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                ref={fileInputRef}
-                onChange={handlePhotoSelect}
-              />
-
+              <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handlePhotoSelect} />
               {photo ? (
                 <div className="size-20 rounded-2xl overflow-hidden border-2 border-primary/20">
                   <img src={photo} className="w-full h-full object-cover" />
@@ -116,10 +208,37 @@ const CreateTask: React.FC = () => {
             </div>
           </div>
 
+          {/* Location Section */}
+          <div className="p-4 bg-white dark:bg-surface-dark rounded-2xl shadow-sm space-y-4 relative">
+            <div className="flex items-center gap-3">
+              <span className="material-symbols-outlined text-primary">location_on</span>
+              <span className="text-sm font-bold">Ubicación del trabajo</span>
+            </div>
+
+            {isLoaded ? (
+              <AddressSearch
+                onSelect={handleSelect}
+                onMapClick={(lat, lng) => setLocation({ lat, lng })}
+                location={location}
+              />
+            ) : (
+              <div className="h-48 bg-gray-50 dark:bg-gray-800 rounded-2xl animate-pulse flex items-center justify-center">
+                <p className="text-[10px] text-gray-400">Cargando mapa...</p>
+              </div>
+            )}
+
+            {location && (
+              <p className="text-[10px] text-gray-500 bg-gray-50 dark:bg-gray-800 p-2 rounded-lg text-center flex items-center justify-center gap-2">
+                <span className="material-symbols-outlined text-sm text-green-500">check_circle</span>
+                Ubicación confirmada
+              </p>
+            )}
+          </div>
+
           <button
             type="submit"
-            disabled={isSubmitting || !category || !description}
-            className="w-full bg-primary text-white font-bold py-4 rounded-2xl shadow-lg shadow-primary/20 disabled:opacity-50 active:scale-95 transition-all"
+            disabled={isSubmitting || !category || !description || !location}
+            className="w-full bg-primary text-white font-bold py-4 rounded-2xl shadow-lg shadow-primary/20 disabled:opacity-50 active:scale-95 transition-all mt-4"
           >
             {isSubmitting ? 'Publicando...' : 'Confirmar Pedido'}
           </button>
@@ -127,7 +246,7 @@ const CreateTask: React.FC = () => {
       </main>
 
       <BottomNav />
-    </div>
+    </div >
   );
 };
 

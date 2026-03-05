@@ -19,19 +19,29 @@ import ProfessionalList from './screens/ProfessionalList';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { state } = useApp();
+  if (!state.isInitialized) return (
+    <div className="min-h-screen flex items-center justify-center bg-white dark:bg-background-dark">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+    </div>
+  );
   if (!state.currentUser) return <Navigate to="/login" replace />;
   return <>{children}</>;
 };
 
 const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { state } = useApp();
+  if (!state.isInitialized) return (
+    <div className="min-h-screen flex items-center justify-center bg-white dark:bg-background-dark">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+    </div>
+  );
   if (state.currentUser) return <Navigate to="/home" replace />;
   return <>{children}</>;
 };
 
 const AppRoutes: React.FC = () => {
   return (
-    <div className="max-w-md mx-auto min-h-screen relative shadow-2xl bg-white dark:bg-background-dark">
+    <div className="flex-1 w-full h-full relative shadow-2xl bg-white dark:bg-background-dark overflow-hidden flex flex-col">
       <Routes>
         <Route path="/" element={<PublicRoute><LandingPage /></PublicRoute>} />
         <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
