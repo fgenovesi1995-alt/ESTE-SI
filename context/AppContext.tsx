@@ -532,7 +532,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     <AppContext.Provider value={{
       state, login, register, logout, updateUser, toggleProMode,
       createTask, applyToTask, addCard, sendMessage, getChatForPro,
-      createPaymentPreference
+      createPaymentPreference, fetchTasks
     }}>
       {children}
     </AppContext.Provider>

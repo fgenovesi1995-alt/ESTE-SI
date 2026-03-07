@@ -1,14 +1,13 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import Header from '../components/Header';
 import BottomNav from '../components/BottomNav';
 import { Browser } from '@capacitor/browser';
 import { Capacitor } from '@capacitor/core';
 
 const TasksHistory: React.FC = () => {
   const navigate = useNavigate();
-  const { state, createPaymentPreference } = useApp();
+  const { state, createPaymentPreference, fetchTasks } = useApp();
 
   const myTasks = state.isProMode
     ? state.tasks.filter(t => t.proId === state.currentUser?.id)
@@ -16,11 +15,15 @@ const TasksHistory: React.FC = () => {
 
   const handlePayment = async (task: any) => {
     try {
-      // If it's the test task, we use $10, otherwise default to $5000 (standard for now)
-      const amount = task.description.includes('enchufe') ? 10 : 5000;
+      // MP Argentina minimum is ~100 ARS. Using 500 for a real test.
+      const amount = 500;
       const url = await createPaymentPreference(task.id, amount, `Pago por servicio: ${task.category}`);
-      // Use Capacitor Browser plugin when running as native app, fall back to window.open for web
       if (Capacitor.isNativePlatform()) {
+        // Listen for browser close to refresh tasks (webhook may have updated status)
+        await Browser.addListener('browserFinished', () => {
+          fetchTasks();
+          Browser.removeAllListeners();
+        });
         await Browser.open({ url, windowName: '_blank' });
       } else {
         window.open(url, '_blank');
@@ -87,7 +90,7 @@ const TasksHistory: React.FC = () => {
                           onClick={() => handlePayment(task)}
                           className="bg-primary text-white text-[10px] font-black px-4 py-2 rounded-xl shadow-lg shadow-primary/20 active:scale-95 transition-all"
                         >
-                          PAGAR $5.000
+                          PAGAR $500
                         </button>
                       )}
                     </div>
