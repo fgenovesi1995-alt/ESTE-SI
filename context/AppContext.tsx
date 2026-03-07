@@ -116,7 +116,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             id: m.id,
             senderId: m.sender_id,
             text: m.text,
-            timestamp: m.created_at
+            timestamp: m.timestamp
           })).sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
         }));
         setState(prev => ({ ...prev, chats }));
@@ -246,6 +246,33 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         registerPushNotifications();
       }
     }
+  }, [state.currentUser?.id]);
+
+  useEffect(() => {
+    if (!state.currentUser) return;
+
+    console.log("[AppContext] Setting up real-time chat subscription...");
+    const channel = supabase
+      .channel('chat_updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages'
+        },
+        async (payload) => {
+          console.log("[AppContext] New message received via Realtime:", payload.new);
+          // Small delay to ensure DB consistency across nodes before fetching
+          setTimeout(() => fetchChats(), 500);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      console.log("[AppContext] Removing real-time chat subscription...");
+      supabase.removeChannel(channel);
+    };
   }, [state.currentUser?.id]);
 
   const registerPushNotifications = async () => {

@@ -125,7 +125,8 @@ const Login: React.FC = () => {
       </div>
 
       <p className="text-center text-xs text-gray-400 pb-8">
-        Al ingresar, aceptas nuestros Términos y Condiciones.
+        Al ingresar, aceptas nuestra{' '}
+        <button onClick={() => navigate('/privacy')} className="text-primary hover:underline">Política de Privacidad</button>.
       </p>
     </div>
   );

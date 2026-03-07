@@ -16,6 +16,7 @@ import Inbox from './screens/Inbox';
 import AISupport from './screens/AISupport';
 import TasksHistory from './screens/TasksHistory';
 import ProfessionalList from './screens/ProfessionalList';
+import Privacy from './screens/Privacy';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { state } = useApp();
@@ -57,6 +58,7 @@ const AppRoutes: React.FC = () => {
         <Route path="/map" element={<ProtectedRoute><MapView /></ProtectedRoute>} />
         <Route path="/inbox" element={<ProtectedRoute><Inbox /></ProtectedRoute>} />
         <Route path="/ai-support" element={<ProtectedRoute><AISupport /></ProtectedRoute>} />
+        <Route path="/privacy" element={<Privacy />} />
 
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
