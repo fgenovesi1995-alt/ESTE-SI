@@ -1,9 +1,10 @@
-
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import Header from '../components/Header';
 import BottomNav from '../components/BottomNav';
+import { Browser } from '@capacitor/browser';
+import { Capacitor } from '@capacitor/core';
 
 const TasksHistory: React.FC = () => {
   const navigate = useNavigate();
@@ -18,7 +19,12 @@ const TasksHistory: React.FC = () => {
       // If it's the test task, we use $10, otherwise default to $5000 (standard for now)
       const amount = task.description.includes('enchufe') ? 10 : 5000;
       const url = await createPaymentPreference(task.id, amount, `Pago por servicio: ${task.category}`);
-      window.location.href = url;
+      // Use Capacitor Browser plugin when running as native app, fall back to window.open for web
+      if (Capacitor.isNativePlatform()) {
+        await Browser.open({ url, windowName: '_blank' });
+      } else {
+        window.open(url, '_blank');
+      }
     } catch (err: any) {
       alert(err.message);
     }
