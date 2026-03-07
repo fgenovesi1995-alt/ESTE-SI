@@ -5,6 +5,10 @@ const corsHeaders = {
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Always use the production Vercel URL for back_urls.
+// Mercado Pago requires valid HTTPS URLs - capacitor:// won't work.
+const BASE_URL = "https://estesi-pi.vercel.app";
+
 serve(async (req) => {
     if (req.method === 'OPTIONS') {
         return new Response('ok', { headers: corsHeaders });
@@ -12,24 +16,24 @@ serve(async (req) => {
 
     try {
         const bodyText = await req.text();
+        console.log("Request body received:", bodyText);
+
         if (!bodyText) throw new Error('Empty request body');
 
         const { taskId, amount, description, userEmail } = JSON.parse(bodyText);
         const accessToken = Deno.env.get('MP_ACCESS_TOKEN');
 
         if (!accessToken) {
+            console.error("CRITICAL: MP_ACCESS_TOKEN not found in environment secrets");
             return new Response(
                 JSON.stringify({ error: "Missing MP_ACCESS_TOKEN in Supabase Secrets" }),
                 { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
             );
         }
 
-        const origin = req.headers.get('origin') || 'http://localhost:5173';
-        const absoluteBaseUrl = origin.endsWith('/') ? origin.slice(0, -1) : origin;
-
         const preferenceBody = {
             items: [{
-                title: description || `Servicio Arreglado`,
+                title: description || `Servicio Arreglados`,
                 quantity: 1,
                 unit_price: Number(amount),
                 currency_id: 'ARS'
@@ -38,13 +42,16 @@ serve(async (req) => {
                 email: (userEmail && userEmail.includes('@')) ? userEmail : "test_user_123@testuser.com"
             },
             back_urls: {
-                success: `${absoluteBaseUrl}/#/tasks?status=success`,
-                failure: `${absoluteBaseUrl}/#/tasks?status=failure`,
-                pending: `${absoluteBaseUrl}/#/tasks?status=pending`
+                success: `${BASE_URL}/#/tasks?status=success`,
+                failure: `${BASE_URL}/#/tasks?status=failure`,
+                pending: `${BASE_URL}/#/tasks?status=pending`
             },
-            // REMOVED auto_return: 'approved' because it strictly requires HTTPS and causes 400 errors on localhost
-            external_reference: taskId
+            auto_return: 'approved',
+            external_reference: taskId,
+            notification_url: `https://vmpqijxvcfgjswvvllli.supabase.co/functions/v1/mercadopago-webhook`
         };
+
+        console.log("MP Preference Body:", JSON.stringify(preferenceBody));
 
         const mpResponse = await fetch('https://api.mercadopago.com/checkout/preferences', {
             method: 'POST',
@@ -56,6 +63,8 @@ serve(async (req) => {
         });
 
         const mpData = await mpResponse.json();
+        console.log("MP Response Status:", mpResponse.status);
+        console.log("MP Response Data:", JSON.stringify(mpData));
 
         if (!mpResponse.ok) {
             return new Response(
@@ -74,6 +83,7 @@ serve(async (req) => {
         );
 
     } catch (error) {
+        console.error("Edge Function Exception:", error.message);
         return new Response(
             JSON.stringify({ error: error.message }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
