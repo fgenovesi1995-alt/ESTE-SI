@@ -15,8 +15,8 @@ const TasksHistory: React.FC = () => {
 
   const handlePayment = async (task: any) => {
     try {
-      // For demo, we assume a fixed amount or we could fetch it from the task if added to DB
-      const amount = 5000; // Placeholder amount
+      // If it's the test task, we use $10, otherwise default to $5000 (standard for now)
+      const amount = task.description.includes('enchufe') ? 10 : 5000;
       const url = await createPaymentPreference(task.id, amount, `Pago por servicio: ${task.category}`);
       window.location.href = url;
     } catch (err: any) {
