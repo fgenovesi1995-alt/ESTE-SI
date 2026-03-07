@@ -63,7 +63,7 @@ const TasksHistory: React.FC = () => {
                   <div className="flex items-center gap-2">
                     <span className="material-symbols-outlined text-xs text-gray-400">calendar_today</span>
                     <p className="text-[10px] text-gray-500">
-                      {new Date(task.createdAt).toLocaleDateString()}
+                      {task.createdAt ? new Date(task.createdAt).toLocaleDateString() : '--/--/--'}
                     </p>
                   </div>
                   {task.status === 'accepted' && (

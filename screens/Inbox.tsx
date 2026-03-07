@@ -69,7 +69,9 @@ const Inbox: React.FC = () => {
                     <div className="flex justify-between items-center mb-1">
                       <h3 className="font-bold text-sm">{displayName}</h3>
                       <span className="text-[10px] text-gray-400">
-                        {new Date(chat.messages[chat.messages.length - 1].timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {chat.messages[chat.messages.length - 1].timestamp
+                          ? new Date(chat.messages[chat.messages.length - 1].timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                          : '--:--'}
                       </span>
                     </div>
                     <p className="text-xs text-gray-500 line-clamp-1">

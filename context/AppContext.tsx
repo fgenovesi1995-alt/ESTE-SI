@@ -36,6 +36,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // --- Utility Functions ---
 
+  const safeDate = (dateStr: any) => {
+    if (!dateStr) return new Date().toISOString();
+    const d = new Date(dateStr);
+    return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+  };
+
   const fetchProfessionals = async () => {
     try {
       const { data } = await supabase
@@ -116,7 +122,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             id: m.id,
             senderId: m.sender_id,
             text: m.text,
-            timestamp: m.timestamp
+            timestamp: safeDate(m.timestamp || m.inserted_at)
           })).sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
         }));
         setState(prev => ({ ...prev, chats }));

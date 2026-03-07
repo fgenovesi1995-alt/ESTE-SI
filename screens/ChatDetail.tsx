@@ -123,7 +123,7 @@ const ChatDetail: React.FC = () => {
                 }`}>
                 {msg.text}
                 <div className={`text-[9px] mt-1 ${isMe ? 'text-white/70' : 'text-gray-400'}`}>
-                  {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  {msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
                 </div>
               </div>
             </div>
