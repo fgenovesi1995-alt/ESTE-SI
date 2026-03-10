@@ -10,6 +10,7 @@ const Login: React.FC = () => {
   const [isRegistering, setIsRegistering] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -17,12 +18,20 @@ const Login: React.FC = () => {
   const msg = (location.state as any)?.message;
 
   const handleSubmit = async (role: 'user' | 'pro') => {
-    if (!email.includes('@') || password.length < 6) {
+    const cleanEmail = email.trim();
+    const cleanPassword = password.trim();
+
+    if (!cleanEmail.includes('@') || cleanPassword.length < 6) {
       setError("Email inválido o contraseña muy corta (min 6 caracteres)");
       return;
     }
 
-    if (isRegistering && !name) {
+    if (isRegistering && password !== confirmPassword) {
+      setError("Las contraseñas no coinciden");
+      return;
+    }
+
+    if (isRegistering && !name.trim()) {
       setError("Ingresa tu nombre para registrarte");
       return;
     }
@@ -32,13 +41,13 @@ const Login: React.FC = () => {
 
     try {
       if (isRegistering) {
-        await register(email, password, role, name);
-        // Supabase often logs in automatically, but might require email confirmation.
-        // Assuming auto-login or immediate redirect.
+        await register(cleanEmail, cleanPassword, role, name.trim());
+        setError("¡Registro exitoso! Por favor, verifica tu email antes de ingresar.");
+        setIsRegistering(false);
       } else {
-        await login(email, password);
+        await login(cleanEmail, cleanPassword);
+        navigate('/home');
       }
-      navigate('/home');
     } catch (err: any) {
       setError(err.message || "Error de autenticación");
     } finally {
@@ -91,6 +100,16 @@ const Login: React.FC = () => {
             value={password}
             onChange={e => setPassword(e.target.value)}
           />
+
+          {isRegistering && (
+            <input
+              type="password"
+              placeholder="Confirmar Contraseña"
+              className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl p-4 focus:ring-2 focus:ring-primary"
+              value={confirmPassword}
+              onChange={e => setConfirmPassword(e.target.value)}
+            />
+          )}
 
           <button
             disabled={loading}
