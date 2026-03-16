@@ -15,7 +15,8 @@ const ProfileSettings: React.FC = () => {
     name: state.currentUser?.name || '',
     lastName: state.currentUser?.lastName || '',
     dni: state.currentUser?.dni || '',
-    photo: state.currentUser?.photo || 'https://picsum.photos/seed/user/200'
+    photo: state.currentUser?.photo || 'https://picsum.photos/seed/user/200',
+    profession: (state.currentUser as any)?.profession || ''
   });
 
   const [cardData, setCardData] = useState({
@@ -122,81 +123,24 @@ const ProfileSettings: React.FC = () => {
                 onChange={e => setFormData({ ...formData, dni: e.target.value })}
               />
             </div>
+
+            {state.isProMode && (
+              <div>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Título de tu Profesión (Opcional)</label>
+                <input
+                  type="text"
+                  disabled={!isEditing}
+                  placeholder="Ej: Electricista Matriculado"
+                  className="w-full mt-1 bg-gray-50 dark:bg-gray-800 border-none rounded-xl px-4 py-3 disabled:text-gray-400 text-sm"
+                  value={formData.profession}
+                  onChange={e => setFormData({ ...formData, profession: e.target.value })}
+                />
+              </div>
+            )}
           </div>
         </section>
 
-        {/* Payment Methods - Only for Users */}
-        {!state.isProMode && (
-          <section className="bg-white dark:bg-surface-dark rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold">Métodos de Pago</h2>
-              <button
-                onClick={() => setShowAddCard(!showAddCard)}
-                className="text-primary text-xs font-bold"
-              >
-                {showAddCard ? 'Cancelar' : 'Agregar'}
-              </button>
-            </div>
 
-            <div className="space-y-3">
-              {state.currentUser?.cards.map(card => (
-                <div key={card.id} className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl">
-                  <div className="size-10 bg-white dark:bg-gray-700 rounded-xl flex items-center justify-center shadow-sm">
-                    <span className="material-symbols-outlined text-primary">credit_card</span>
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-bold">•••• •••• {card.number.slice(-4)}</p>
-                    <p className="text-[10px] text-gray-500 font-medium">{card.brand} • Vence {card.expiry}</p>
-                  </div>
-                </div>
-              ))}
-
-              {showAddCard && (
-                <div className="p-4 bg-primary/5 rounded-2xl border border-primary/20 space-y-4 animate-in slide-in-from-top duration-300">
-                  <input
-                    type="text"
-                    placeholder="Número de tarjeta"
-                    className="w-full bg-white dark:bg-gray-800 border-none rounded-xl px-4 py-2 text-sm"
-                    value={cardData.number}
-                    onChange={e => setCardData({ ...cardData, number: e.target.value })}
-                  />
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="MM/YY"
-                      className="w-1/2 bg-white dark:bg-gray-800 border-none rounded-xl px-4 py-2 text-sm"
-                      value={cardData.expiry}
-                      onChange={e => setCardData({ ...cardData, expiry: e.target.value })}
-                    />
-                    <button
-                      onClick={handleAddCard}
-                      className="w-1/2 bg-primary text-white font-bold rounded-xl text-sm"
-                    >
-                      Guardar
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </section>
-        )}
-
-        {/* AI Support Banner */}
-        <button
-          onClick={() => navigate('/ai-support')}
-          className="w-full flex items-center justify-between p-6 bg-gradient-to-br from-indigo-600 to-blue-700 text-white rounded-3xl shadow-lg active:scale-95 transition-all"
-        >
-          <div className="flex items-center gap-4">
-            <div className="size-12 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center">
-              <span className="material-symbols-outlined text-2xl">smart_toy</span>
-            </div>
-            <div className="text-left">
-              <p className="font-bold">Soporte con IA</p>
-              <p className="text-[10px] opacity-80">Respuestas al instante</p>
-            </div>
-          </div>
-          <span className="material-symbols-outlined">chevron_right</span>
-        </button>
 
         {/* Mode Swap & Logout */}
         <div className="pt-4 space-y-3">

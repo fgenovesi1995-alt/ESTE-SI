@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import { supabase } from '../services/supabase';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
@@ -135,12 +136,34 @@ const Login: React.FC = () => {
           </button>
         </div>
 
-        <button
-          onClick={() => { setIsRegistering(!isRegistering); setError(null); }}
-          className="mt-8 text-sm text-primary font-medium hover:underline"
-        >
-          {isRegistering ? '¿Ya tienes cuenta? Iniciar Sesión' : '¿No tienes cuenta? Crear una'}
-        </button>
+        <div className="mt-8 flex flex-col items-center gap-4">
+          <button
+            onClick={() => { setIsRegistering(!isRegistering); setError(null); }}
+            className="text-sm text-primary font-medium hover:underline"
+          >
+            {isRegistering ? '¿Ya tienes cuenta? Iniciar Sesión' : '¿No tienes cuenta? Crear una'}
+          </button>
+
+          {!isRegistering && (
+            <button
+              onClick={async () => {
+                const emailTrim = email.trim();
+                if (!emailTrim.includes('@')) {
+                  setError("Ingresa tu email para recuperar la contraseña");
+                  return;
+                }
+                const { error } = await supabase.auth.resetPasswordForEmail(emailTrim, {
+                  redirectTo: window.location.origin + '/reset-password',
+                });
+                if (error) setError(error.message);
+                else setError("Se ha enviado un correo para restablecer tu contraseña.");
+              }}
+              className="text-xs text-gray-400 font-medium hover:text-primary transition-colors"
+            >
+              Olvidé mi contraseña
+            </button>
+          )}
+        </div>
       </div>
 
       <p className="text-center text-xs text-gray-400 pb-8">

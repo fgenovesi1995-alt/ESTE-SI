@@ -16,7 +16,7 @@ serve(async (req) => {
 
     try {
         const bodyText = await req.text();
-        console.log("Request body received:", bodyText);
+        console.log("[mercadopago-payment] Request body received:", bodyText);
 
         if (!bodyText) throw new Error('Empty request body');
 
@@ -24,7 +24,7 @@ serve(async (req) => {
         const accessToken = Deno.env.get('MP_ACCESS_TOKEN');
 
         if (!accessToken) {
-            console.error("CRITICAL: MP_ACCESS_TOKEN not found in environment secrets");
+            console.error("[mercadopago-payment] CRITICAL: MP_ACCESS_TOKEN not found in environment secrets");
             return new Response(
                 JSON.stringify({ error: "Missing MP_ACCESS_TOKEN in Supabase Secrets" }),
                 { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
@@ -51,7 +51,7 @@ serve(async (req) => {
             notification_url: `https://vmpqijxvcfgjswvvllli.supabase.co/functions/v1/mercadopago-webhook`
         };
 
-        console.log("MP Preference Body:", JSON.stringify(preferenceBody));
+        console.log("[mercadopago-payment] Sending Preference Body to MP:", JSON.stringify(preferenceBody));
 
         const mpResponse = await fetch('https://api.mercadopago.com/checkout/preferences', {
             method: 'POST',
@@ -63,10 +63,11 @@ serve(async (req) => {
         });
 
         const mpData = await mpResponse.json();
-        console.log("MP Response Status:", mpResponse.status);
-        console.log("MP Response Data:", JSON.stringify(mpData));
+        console.log("[mercadopago-payment] MP Response Status:", mpResponse.status);
+        console.log("[mercadopago-payment] MP Response Data:", JSON.stringify(mpData));
 
         if (!mpResponse.ok) {
+            console.error("[mercadopago-payment] MP API Error Details:", JSON.stringify(mpData));
             return new Response(
                 JSON.stringify({
                     error: "Mercado Pago API Error",
@@ -77,13 +78,21 @@ serve(async (req) => {
             );
         }
 
+        if (!mpData.init_point) {
+            console.error("[mercadopago-payment] CRITICAL: init_point missing in MP response", mpData);
+            return new Response(
+                JSON.stringify({ error: "No se obtuvo init_point de Mercado Pago", details: mpData }),
+                { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+            );
+        }
+
         return new Response(
             JSON.stringify({ id: mpData.id, init_point: mpData.init_point }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
         );
 
     } catch (error) {
-        console.error("Edge Function Exception:", error.message);
+        console.error("[mercadopago-payment] Edge Function Exception:", error.message);
         return new Response(
             JSON.stringify({ error: error.message }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }

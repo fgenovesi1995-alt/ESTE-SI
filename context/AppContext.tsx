@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
-import { User, Task, Chat, Professional, AppState, Role, Message, Card } from '../types';
+import { User, Task, Chat, Professional, AppState, Role, Message, Card, InAppNotification } from '../types';
 import { supabase } from '../services/supabase';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { Capacitor } from '@capacitor/core';
@@ -11,11 +11,12 @@ interface AppContextType {
   logout: () => Promise<void>;
   updateUser: (data: Partial<User>) => Promise<void>;
   toggleProMode: () => void;
-  createTask: (category: string, description: string, photo?: string, location?: { lat: number, lng: number }) => Promise<void>;
+  createTask: (category: string, description: string, photo?: string, location?: { lat: number, lng: number }, budget?: number) => Promise<void>;
   applyToTask: (taskId: string) => Promise<void>;
   addCard: (card: Omit<Card, 'id'>) => void;
   sendMessage: (chatId: string, text: string) => Promise<void>;
   getChatForPro: (proId: string) => Promise<Chat>;
+  fetchNotifications: () => Promise<void>;
   createPaymentPreference: (taskId: string, amount: number, description: string) => Promise<string>;
 }
 
@@ -27,6 +28,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     tasks: [],
     chats: [],
     professionals: [],
+    profiles: [],
     notifications: [],
     isProMode: false,
     isInitialized: false
@@ -73,10 +75,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const fetchTasks = async () => {
     try {
-      console.log("Refreshing tasks list...");
+      console.log("[AppContext] Fetching tasks with profiles...");
       const { data, error } = await supabase
         .from('tasks')
-        .select('*, creator:profiles!tasks_user_id_fkey(first_name)')
+        .select(`
+          *,
+          creator:profiles!tasks_user_id_fkey(first_name, last_name, photo),
+          pro:profiles!tasks_pro_id_fkey(first_name, last_name, photo)
+        `)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -85,19 +91,27 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
 
       if (data) {
-        console.log(`Fetched ${data.length} tasks successfully.`);
-        const tasks: Task[] = data.map(t => ({
-          id: t.id,
-          userId: t.user_id,
-          userName: (t.creator as any)?.first_name || 'Usuario',
-          proId: t.pro_id,
-          category: t.category,
-          description: t.description,
-          photo: t.photo,
-          location: t.location,
-          status: t.status,
-          createdAt: t.created_at
-        }));
+        const tasks: Task[] = data.map(t => {
+          const creator = t.creator as any;
+          const proProfile = t.pro as any;
+
+          return {
+            id: t.id,
+            userId: t.user_id,
+            userName: creator ? `${creator.first_name || ''} ${creator.last_name || ''}`.trim() || 'Usuario' : 'Usuario',
+            userLastName: '', // We already concatenated it into name for simplicity in UI
+            proId: t.pro_id,
+            proName: proProfile ? `${proProfile.first_name || ''} ${proProfile.last_name || ''}`.trim() || 'Profesional' : 'Profesional',
+            proLastName: '',
+            category: t.category,
+            description: t.description,
+            photo: t.photo,
+            location: t.location,
+            status: t.status,
+            createdAt: t.created_at
+          };
+        });
+        console.log(`[AppContext] Fetched ${tasks.length} tasks successfully.`);
         setState(prev => ({ ...prev, tasks }));
       }
     } catch (e) {
@@ -110,7 +124,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     try {
       const { data: chatData, error } = await supabase
         .from('chats')
-        .select('*, messages(*)')
+        .select(`
+          *,
+          messages(*)
+        `)
         .contains('participants', [state.currentUser.id]);
 
       if (!error && chatData) {
@@ -126,9 +143,124 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           })).sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
         }));
         setState(prev => ({ ...prev, chats }));
+
+        // Fetch missing profiles for participants
+        const allParticipantIds = Array.from(new Set(chats.flatMap(c => c.participants)));
+        const missingIds = allParticipantIds.filter(id => id !== state.currentUser?.id);
+
+        if (missingIds.length > 0) {
+          console.log("[AppContext] Fetching missing profiles for participants:", missingIds);
+          const { data: profilesData } = await supabase
+            .from('profiles')
+            .select('id, first_name, last_name, photo, role, category, rating, is_premium, bio, reviews_count, price_per_hour, earnings, completed_jobs')
+            .in('id', missingIds);
+
+          const profiles = profilesData as any[];
+
+          if (profiles) {
+            console.log(`[AppContext] Fetched ${profiles.length} participant profiles.`);
+            const users: User[] = profiles.map(p => ({
+              id: p.id,
+              name: `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Usuario',
+              lastName: '',
+              dni: p.dni || '',
+              photo: p.photo || 'https://picsum.photos/seed/user/200',
+              role: (p.role as Role) || 'user',
+              email: p.email || '',
+              cards: [],
+              location: p.location,
+              pushToken: p.push_token
+            }));
+
+            setState(prev => {
+              const newProfiles = [...prev.profiles];
+              users.forEach(u => {
+                const existingIndex = newProfiles.findIndex(p => p.id === u.id);
+                if (existingIndex === -1) {
+                  newProfiles.push(u);
+                } else {
+                  newProfiles[existingIndex] = u; // Ensure we update the name/photo
+                }
+              });
+
+              const fetchedPros = profiles.filter(p => p.role === 'pro').map(p => ({
+                id: p.id,
+                name: `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Profesional',
+                category: p.category || 'General',
+                rating: p.rating || 5.0,
+                isPremium: p.is_premium || false,
+                location: 'Ubicación Pro',
+                bio: p.bio || '',
+                photo: p.photo || 'https://picsum.photos/seed/pro/200',
+                reviewsCount: p.reviews_count || 0,
+                pricePerHour: p.price_per_hour || 0,
+                earnings: p.earnings || 0,
+                completedJobs: p.completed_jobs || 0
+              }));
+
+              const newPros = [...prev.professionals];
+              fetchedPros.forEach(fp => {
+                const existingIndex = newPros.findIndex(p => p.id === fp.id);
+                if (existingIndex === -1) {
+                  newPros.push(fp);
+                } else {
+                  newPros[existingIndex] = fp; // Update existing
+                }
+              });
+
+              return { ...prev, profiles: newProfiles, professionals: newPros };
+            });
+          }
+        }
       }
     } catch (e) {
       console.error("Error fetching chats:", e);
+    }
+  };
+
+  const fetchNotifications = async () => {
+    if (!state.currentUser) return;
+    try {
+      console.log("[AppContext] Fetching notifications...");
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', state.currentUser.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      if (data) {
+        const notifications: InAppNotification[] = data.map(n => ({
+          id: n.id,
+          userId: n.user_id,
+          title: n.title,
+          message: n.message,
+          read: n.read,
+          createdAt: n.created_at
+        }));
+        setState(prev => ({ ...prev, notifications }));
+      }
+    } catch (e) {
+      console.error("[AppContext] fetchNotifications error:", e);
+    }
+  };
+
+  const markNotificationsAsRead = async () => {
+    if (!state.currentUser) return;
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ read: true })
+        .eq('user_id', state.currentUser.id);
+
+      if (!error) {
+        setState(prev => ({
+          ...prev,
+          notifications: prev.notifications.map(n => ({ ...n, read: true }))
+        }));
+      }
+    } catch (e) {
+      console.error("[AppContext] markNotificationsAsRead error:", e);
     }
   };
 
@@ -246,6 +378,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (state.currentUser) {
       fetchTasks();
       fetchChats();
+      fetchNotifications();
 
       // Register for push notifications if on native platform
       if (Capacitor.isNativePlatform()) {
@@ -257,27 +390,45 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   useEffect(() => {
     if (!state.currentUser) return;
 
-    console.log("[AppContext] Setting up real-time chat subscription...");
-    const channel = supabase
+    console.log("[AppContext] Setting up real-time subscriptions for user:", state.currentUser.id);
+
+    // 1. Chat Sub (messages)
+    const chatSub = supabase
       .channel('chat_updates')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages'
-        },
-        async (payload) => {
-          console.log("[AppContext] New message received via Realtime:", payload.new);
-          // Small delay to ensure DB consistency across nodes before fetching
-          setTimeout(() => fetchChats(), 500);
-        }
-      )
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
+        console.log("[AppContext] REALTIME MESSAGE RECEIVED:", payload.new);
+        setTimeout(() => fetchChats(), 500);
+      })
+      .subscribe();
+
+    // 2. Task Sub (status updates)
+    const taskSub = supabase
+      .channel('task_updates')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'tasks' }, (payload) => {
+        console.log("[AppContext] REALTIME TASK UPDATE RECEIVED:", payload.new);
+        fetchTasks();
+      })
+      .subscribe();
+
+    // 3. Notification Sub
+    const notifSub = supabase
+      .channel('notification_updates')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'notifications',
+        filter: `user_id=eq.${state.currentUser.id}`
+      }, (payload) => {
+        console.log("[AppContext] REALTIME NOTIFICATION RECEIVED:", payload.new);
+        fetchNotifications();
+      })
       .subscribe();
 
     return () => {
-      console.log("[AppContext] Removing real-time chat subscription...");
-      supabase.removeChannel(channel);
+      console.log("[AppContext] Cleaning up subscriptions...");
+      supabase.removeChannel(chatSub);
+      supabase.removeChannel(taskSub);
+      supabase.removeChannel(notifSub);
     };
   }, [state.currentUser?.id]);
 
@@ -423,7 +574,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }));
   };
 
-  const createTask = async (category: string, description: string, photo?: string, location?: { lat: number, lng: number }) => {
+  const createTask = async (category: string, description: string, photo?: string, location?: { lat: number, lng: number }, budget?: number) => {
     if (!state.currentUser) return;
     const { error } = await supabase.from('tasks').insert({
       user_id: state.currentUser.id,
@@ -431,6 +582,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       description,
       photo,
       location,
+      budget,
       status: 'pending'
     });
     if (error) {
@@ -532,7 +684,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     <AppContext.Provider value={{
       state, login, register, logout, updateUser, toggleProMode,
       createTask, applyToTask, addCard, sendMessage, getChatForPro,
-      createPaymentPreference, fetchTasks
+      createPaymentPreference, fetchTasks, fetchNotifications, markNotificationsAsRead
     }}>
       {children}
     </AppContext.Provider>

@@ -15,6 +15,8 @@ const ProfessionalList: React.FC<{ isPremiumOnly?: boolean }> = ({ isPremiumOnly
     const matchesPremium = isPremiumOnly ? p.isPremium : true;
     return matchesCategory && matchesPremium;
   }).sort((a, b) => {
+    if (a.isPremium && !b.isPremium) return -1;
+    if (!a.isPremium && b.isPremium) return 1;
     if (sortBy === 'rating') return b.rating - a.rating;
     return (a.pricePerHour || 0) - (b.pricePerHour || 0);
   });
@@ -73,7 +75,7 @@ const ProfessionalList: React.FC<{ isPremiumOnly?: boolean }> = ({ isPremiumOnly
                     <span className="text-[10px] font-black">{pro.rating}</span>
                   </div>
                 </div>
-                <p className="text-[10px] text-gray-400 mb-1">{pro.category} • {pro.location}</p>
+                <p className="text-[10px] text-gray-400 mb-1">{(pro as any).profession || pro.category} • {pro.location}</p>
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-black text-primary">${pro.pricePerHour}/h</p>
                   <p className="text-[9px] text-gray-500 font-bold">{pro.reviewsCount} reseñas</p>

@@ -31,9 +31,6 @@ const ProDashboard: React.FC = () => {
             </p>
             <h1 className="text-2xl font-bold">¡Hola, {state.currentUser?.name}!</h1>
           </div>
-          <div className="size-12 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-600">
-            <span className="material-symbols-outlined">analytics</span>
-          </div>
         </div>
 
         {/* Metrics Grid */}
@@ -91,6 +88,11 @@ const ProDashboard: React.FC = () => {
 
                   <button
                     onClick={async () => {
+                      if (!state.currentUser?.name || !state.currentUser?.lastName || !state.currentUser?.dni || !state.currentUser?.photo) {
+                        alert("⚠️ Perfil Incompleto\n\nDebes completar tus datos (Nombre, Apellido, DNI y Foto) en 'Mi Perfil' antes de postularte a trabajos.");
+                        navigate('/profile');
+                        return;
+                      }
                       try {
                         await applyToTask(task.id);
                       } catch (err: any) {

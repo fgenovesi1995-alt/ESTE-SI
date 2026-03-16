@@ -8,7 +8,7 @@ import { GOOGLE_MAPS_LIBRARIES } from '../services/googleMaps';
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
-const CATEGORIES = ['Electricidad', 'Plomería', 'Pintura', 'Limpieza', 'Jardinería', 'Cerrajería', 'Mudanzas'];
+const CATEGORIES = ['Electricidad', 'Plomería', 'Gas', 'Aire Acondicionado', 'Carpintería', 'Herrería', 'Pintura', 'Limpieza', 'Jardinería', 'Cerrajería', 'Mudanzas', 'Electrónica'];
 
 // Sub-component for the search logic to ensure hooks initialize only after script is loaded
 interface AddressSearchProps {
@@ -87,13 +87,14 @@ const AddressSearch: React.FC<AddressSearchProps> = ({ onSelect, onMapClick, loc
 
 const CreateTask: React.FC = () => {
   const navigate = useNavigate();
-  const { createTask } = useApp();
+  const { state, createTask } = useApp();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
   const [photo, setPhoto] = useState<string | null>(null);
   const [location, setLocation] = useState<{ lat: number, lng: number } | null>(null);
+  const [budget, setBudget] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { isLoaded } = useJsApiLoader({
@@ -123,11 +124,15 @@ const CreateTask: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!category || !description) return;
+    if (!state.currentUser?.name || !state.currentUser?.lastName || !state.currentUser?.dni || !state.currentUser?.photo) {
+      alert("⚠️ Perfil Incompleto\n\nDebes completar tus datos (Nombre, Apellido, DNI y Foto) en 'Mi Perfil' antes de publicar una tarea.");
+      navigate('/profile');
+      return;
+    }
 
     setIsSubmitting(true);
     try {
-      await createTask(category, description, photo || undefined, location || undefined);
+      await createTask(category, description, photo || undefined, location || undefined, budget ? parseFloat(budget) : undefined);
       navigate('/tasks');
     } catch (error) {
       console.error(error);
@@ -176,6 +181,21 @@ const CreateTask: React.FC = () => {
               value={description}
               onChange={e => setDescription(e.target.value)}
             />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">Presupuesto Estimado (Opcional)</label>
+            <div className="relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
+              <input
+                type="number"
+                className="w-full bg-white dark:bg-surface-dark border-none rounded-2xl py-4 pl-8 pr-4 text-sm focus:ring-2 focus:ring-primary shadow-sm"
+                placeholder="Ej: 5000"
+                value={budget}
+                onChange={e => setBudget(e.target.value)}
+              />
+            </div>
+            <p className="text-[10px] text-gray-400 ml-1 italic">* Podrás negociar el precio final con el profesional en el chat.</p>
           </div>
 
           {/* Photo Section */}

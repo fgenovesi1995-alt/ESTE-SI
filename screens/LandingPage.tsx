@@ -67,7 +67,7 @@ const LandingPage: React.FC = () => {
                         variants={fadeInUp}
                         className="text-lg text-gray-500 dark:text-gray-400 mb-10 leading-relaxed"
                     >
-                        Encuentra profesionales de confianza para reparaciones y mantenimiento en minutos.
+                        Encontrá profesionales recomendados para reparaciones y mantenimiento en cuestión de minutos.
                     </motion.p>
 
                     <motion.div
@@ -105,11 +105,11 @@ const LandingPage: React.FC = () => {
                     >
                         <div className="flex items-start gap-4">
                             <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-2xl text-primary">
-                                <span className="material-symbols-outlined text-3xl">verified_user</span>
+                                <span className="material-symbols-outlined text-3xl">groups</span>
                             </div>
                             <div>
-                                <h3 className="text-xl font-bold mb-2">100% Verificados</h3>
-                                <p className="text-gray-500">Cada profesional pasa por un riguroso proceso de validación de identidad y antecedentes.</p>
+                                <h3 className="text-xl font-bold mb-2">Comunidad Confiable</h3>
+                                <p className="text-gray-500 text-sm">Basamos la confianza en las reseñas de otros usuarios. Mirá fotos de trabajos reales y elegí al mejor.</p>
                             </div>
                         </div>
 
@@ -119,17 +119,17 @@ const LandingPage: React.FC = () => {
                             </div>
                             <div>
                                 <h3 className="text-xl font-bold mb-2">Rápido y Fácil</h3>
-                                <p className="text-gray-500">Describe tu problema, recibe ofertas al instante y elige la mejor opción.</p>
+                                <p className="text-gray-500 text-sm">Publicá lo que necesitás, recibí ofertas por chat y coordiná la visita en el acto.</p>
                             </div>
                         </div>
 
                         <div className="flex items-start gap-4">
                             <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-2xl text-purple-600">
-                                <span className="material-symbols-outlined text-3xl">star</span>
+                                <span className="material-symbols-outlined text-3xl">payments</span>
                             </div>
                             <div>
-                                <h3 className="text-xl font-bold mb-2">Calidad Garantizada</h3>
-                                <p className="text-gray-500">Paga solo cuando el trabajo esté terminado y estés satisfecho con el resultado.</p>
+                                <h3 className="text-xl font-bold mb-2">Pago contra entrega</h3>
+                                <p className="text-gray-500 text-sm">Pagás recién cuando el trabajo esté terminado. Sin adelantos riesgosos ni sorpresas.</p>
                             </div>
                         </div>
                     </motion.div>
@@ -146,24 +146,21 @@ const LandingPage: React.FC = () => {
 
                     <div className="space-y-12">
                         <div className="bg-white dark:bg-surface-dark p-6 rounded-3xl shadow-lg border border-gray-100 dark:border-gray-800 relative">
-                            <div className="absolute -left-3 top-1/2 transform -translate-y-1/2 size-6 bg-primary rounded-full border-4 border-white dark:border-surface-dark lg:hidden"></div>
                             <span className="text-4xl mb-4 block">📸</span>
-                            <h3 className="font-bold text-lg">1. Publica</h3>
-                            <p className="text-sm text-gray-500">Sube una foto y describe qué necesitas reparar.</p>
+                            <h3 className="font-bold text-lg">1. Publicá o Buscá</h3>
+                            <p className="text-sm text-gray-500">Subí una foto de lo que falla o buscá directamente por categorías al profesional que necesitás.</p>
                         </div>
 
                         <div className="bg-white dark:bg-surface-dark p-6 rounded-3xl shadow-lg border border-gray-100 dark:border-gray-800 relative">
-                            <div className="absolute -right-3 top-1/2 transform -translate-y-1/2 size-6 bg-primary rounded-full border-4 border-white dark:border-surface-dark lg:hidden"></div>
                             <span className="text-4xl mb-4 block">💬</span>
-                            <h3 className="font-bold text-lg">2. Chatea</h3>
-                            <p className="text-sm text-gray-500">Habla con profesionales interesados y acuerda un precio.</p>
+                            <h3 className="font-bold text-lg">2. Chateá</h3>
+                            <p className="text-sm text-gray-500">Sacate las dudas, pedí un presupuesto estimado y coordiná día y horario.</p>
                         </div>
 
                         <div className="bg-white dark:bg-surface-dark p-6 rounded-3xl shadow-lg border border-gray-100 dark:border-gray-800 relative">
-                            <div className="absolute -left-3 top-1/2 transform -translate-y-1/2 size-6 bg-primary rounded-full border-4 border-white dark:border-surface-dark lg:hidden"></div>
                             <span className="text-4xl mb-4 block">🤝</span>
-                            <h3 className="font-bold text-lg">3. Soluciona</h3>
-                            <p className="text-sm text-gray-500">Recibe el servicio y califica la experiencia.</p>
+                            <h3 className="font-bold text-lg">3. Solucioná</h3>
+                            <p className="text-sm text-gray-500">Recibí al profesional, confirmá el arreglo y pagá de forma segura.</p>
                         </div>
                     </div>
                 </div>
@@ -176,7 +173,7 @@ const LandingPage: React.FC = () => {
                     <div className="absolute bottom-0 left-0 size-32 bg-blue-500/20 blur-3xl rounded-full"></div>
 
                     <h2 className="text-2xl font-bold mb-4 relative z-10">¿Listo para arreglarlo?</h2>
-                    <p className="text-gray-400 mb-8 text-sm relative z-10">Únete a miles de usuarios que ya confían en Arreglados.</p>
+                    <p className="text-gray-400 mb-8 text-sm relative z-10">Unite a la comunidad de soluciones para el hogar más grande de Argentina.</p>
 
                     <button
                         onClick={() => handleStart('user')}

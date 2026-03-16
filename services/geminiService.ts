@@ -24,13 +24,12 @@ export const getAIResponse = async (userPrompt: string) => {
 
   const apiVersions = ["v1", "v1beta"];
   const modelsToTry = [
-    "gemini-2.0-flash",
     "gemini-1.5-flash",
-    "gemini-1.5-flash-001",
-    "gemini-1.5-flash-002",
+    "gemini-1.5-flash-latest",
     "gemini-1.5-flash-8b",
+    "gemini-2.0-flash",
     "gemini-1.5-pro",
-    "gemini-1.5-pro-002",
+    "gemini-1.5-pro-latest",
     "gemini-pro",
     "gemini-1.0-pro"
   ];
@@ -47,24 +46,28 @@ export const getAIResponse = async (userPrompt: string) => {
         try {
           console.log(`[Gemini] [${version}] Attempting: ${variant}...`);
 
-          // Using a clean payload without systemInstruction field to avoid 400 errors in v1
-          const response = await ai.models.generateContent({
-            model: variant,
-            contents: [{ role: "user", parts: [{ text: enrichedPrompt }] }]
-          });
+          const model = ai.getGenerativeModel({ model: variant });
+          const result = await model.generateContent(enrichedPrompt);
+          const text = result.response.text();
 
           console.log(`[Gemini] [${version}] SUCCESS with ${variant}`);
-          return response.text || "No pude generar una respuesta en este momento.";
+          return text || "No pude generar una respuesta en este momento.";
         } catch (error: any) {
-          console.warn(`[Gemini] [${version}] ${variant} failed:`, error.message || error);
+          const msg = error.message || "";
+          console.warn(`[Gemini] [${version}] ${variant} failed:`, msg);
 
-          if (error.message && error.message.includes("limit: 0")) {
-            console.error(`[Gemini] CRITICAL: Quota is ZERO for ${variant} on ${version}.`);
+          if (msg.includes("limit: 0") || msg.includes("Quota exceeded")) {
+            console.error(`[Gemini] CRITICAL: Quota error for ${variant}. Message: ${msg}`);
+          }
+          if (msg.includes("API key not valid") || msg.includes("not authorized")) {
+            return "Tu API Key de Gemini parece no ser válida o no tiene permisos. Por favor revísala en Google AI Studio.";
           }
         }
       }
     }
   }
+
+  return "No pude conectar con ningún modelo de IA. El error 'limit: 0' suele significar que la API de Gemini (Generative Language API) está DESACTIVADA para tu proyecto en Google AI Studio settings. Por favor, asegúrate de que esté habilitada.";
 
   return "No pude conectar con ningún modelo de IA. Por favor, verificá que el 'Generative Language API' esté habilitado para tu API Key en Google AI Studio Settings.";
 };

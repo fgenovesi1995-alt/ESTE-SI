@@ -40,23 +40,9 @@ const Inbox: React.FC = () => {
             {userChats.map(chat => {
               const otherId = chat.participants.find(p => p !== state.currentUser?.id);
 
-              const isPro = state.currentUser?.role === 'professional';
-              let displayName = 'Usuario';
-              let photo = 'https://picsum.photos/seed/user/200';
-
-              if (isPro) {
-                // If current user is pro, the other person is a client (user)
-                // We might not have them as an object, but we check if we have 
-                // any record of them in the app state if we were to add it.
-                // For now, keep fallback but allow it to be found if added.
-              } else {
-                // If current user is client, the other person is a pro
-                const pro = state.professionals.find(p => p.id === otherId);
-                if (pro) {
-                  displayName = pro.name;
-                  photo = pro.photo;
-                }
-              }
+              const otherPerson = state.profiles.find(p => p.id === otherId) || state.professionals.find(p => p.id === otherId);
+              let displayName = otherPerson ? otherPerson.name : 'Usuario';
+              let photo = otherPerson?.photo || 'https://picsum.photos/seed/user/200';
 
               return (
                 <button

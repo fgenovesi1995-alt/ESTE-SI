@@ -24,10 +24,14 @@ const ChatDetail: React.FC = () => {
   useEffect(() => {
     if (!otherId) return;
 
-    // Try to find in pros cache first
+    // Try to find in cache first
     const pro = state.professionals.find(p => p.id === otherId);
-    if (pro) {
-      setOtherPerson({ name: pro.name, photo: pro.photo });
+    const profile = state.profiles.find(p => p.id === otherId);
+    if (pro || profile) {
+      setOtherPerson({
+        name: pro ? pro.name : `${profile?.name || ''} ${profile?.lastName || ''}`.trim(),
+        photo: pro ? pro.photo : profile?.photo
+      });
       return;
     }
 
@@ -42,7 +46,7 @@ const ChatDetail: React.FC = () => {
       }
     };
     fetchOther();
-  }, [otherId, state.professionals]);
+  }, [otherId, state.professionals, state.profiles]);
 
   // If chat doesn't exist in state, ensure it's created/fetched
   useEffect(() => {

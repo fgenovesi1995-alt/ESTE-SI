@@ -43,7 +43,10 @@ export interface Task {
   id: string;
   userId: string;
   userName: string;
+  userLastName?: string;
   proId?: string;
+  proName?: string;
+  proLastName?: string;
   category: string;
   description: string;
   photo?: string;
@@ -69,12 +72,22 @@ export interface Chat {
   lastMessage?: string;
 }
 
+export interface InAppNotification {
+  id: string;
+  userId: string;
+  title: string;
+  message: string;
+  read: boolean;
+  createdAt: string;
+}
+
 export interface AppState {
   currentUser: User | null;
   tasks: Task[];
   chats: Chat[];
   professionals: Professional[];
-  notifications: string[];
+  profiles: User[];
+  notifications: InAppNotification[];
   isProMode: boolean;
   isInitialized: boolean;
 }

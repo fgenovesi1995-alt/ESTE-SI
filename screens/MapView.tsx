@@ -49,7 +49,7 @@ const MapView: React.FC = () => {
 
   return (
     <div className="h-screen flex flex-col bg-gray-100">
-      <header className="absolute top-4 left-4 right-4 z-10 flex flex-col gap-4 pointer-events-none">
+      <header className="absolute top-[calc(env(safe-area-inset-top,24px)+16px)] left-4 right-4 z-10 flex flex-col gap-4 pointer-events-none">
         <div className="flex items-center justify-between w-full">
           <button
             onClick={() => navigate(-1)}

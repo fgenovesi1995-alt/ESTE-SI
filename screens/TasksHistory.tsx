@@ -61,10 +61,26 @@ const TasksHistory: React.FC = () => {
                       {task.category}
                     </span>
                     <h3 className="font-bold">{task.description.substring(0, 30)}...</h3>
+                    <p className="text-[10px] text-gray-400 font-medium">
+                      {state.isProMode
+                        ? `Solicitado por: ${task.userName}`
+                        : task.status !== 'pending' && task.proId
+                          ? `Tomado por: ${task.proName}`
+                          : 'Buscando profesional...'}
+                    </p>
+                    {task.budget && (
+                      <p className="text-[10px] text-primary font-bold mt-1">
+                        Presupuesto sugerido: ${task.budget.toLocaleString()}
+                      </p>
+                    )}
                   </div>
-                  <span className={`text-[10px] font-black px-2 py-1 rounded-md uppercase ${task.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'
+                  <span className={`text-[10px] font-black px-2 py-1 rounded-md uppercase ${task.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                    task.status === 'paid' || task.status === 'completed' ? 'bg-blue-100 text-blue-700' :
+                      'bg-green-100 text-green-700'
                     }`}>
-                    {task.status === 'pending' ? 'Buscando Pro' : 'En curso'}
+                    {task.status === 'pending' ? 'Buscando Pro' :
+                      task.status === 'accepted' ? 'En curso' :
+                        task.status === 'paid' ? 'Pagado' : 'Finalizado'}
                   </span>
                 </div>
 
@@ -88,9 +104,9 @@ const TasksHistory: React.FC = () => {
                       {!state.isProMode && (
                         <button
                           onClick={() => handlePayment(task)}
-                          className="bg-primary text-white text-[10px] font-black px-4 py-2 rounded-xl shadow-lg shadow-primary/20 active:scale-95 transition-all"
+                          className="bg-primary text-white text-xs font-black px-6 py-3 rounded-2xl shadow-lg shadow-primary/20 active:scale-95 transition-all"
                         >
-                          PAGAR $500
+                          PAGAR ${task.budget || 500}
                         </button>
                       )}
                     </div>
