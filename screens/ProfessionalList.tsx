@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import BottomNav from '../components/BottomNav';
+import LegalBanner from '../components/LegalBanner';
 
 const ProfessionalList: React.FC<{ isPremiumOnly?: boolean }> = ({ isPremiumOnly = false }) => {
   const { categoryId } = useParams();
@@ -15,8 +16,18 @@ const ProfessionalList: React.FC<{ isPremiumOnly?: boolean }> = ({ isPremiumOnly
     const matchesPremium = isPremiumOnly ? p.isPremium : true;
     return matchesCategory && matchesPremium;
   }).sort((a, b) => {
+    const aDeudor = (a as any).current_balance < 0;
+    const bDeudor = (b as any).current_balance < 0;
+
+    // Debtors always go to the bottom
+    if (aDeudor && !bDeudor) return 1;
+    if (!aDeudor && bDeudor) return -1;
+
+    // Among non-debtors or among debtors, prioritize Premium
     if (a.isPremium && !b.isPremium) return -1;
     if (!a.isPremium && b.isPremium) return 1;
+
+    // Finally apply chosen filter
     if (sortBy === 'rating') return b.rating - a.rating;
     return (a.pricePerHour || 0) - (b.pricePerHour || 0);
   });
@@ -33,6 +44,7 @@ const ProfessionalList: React.FC<{ isPremiumOnly?: boolean }> = ({ isPremiumOnly
       </header>
 
       <main className="p-4">
+        <LegalBanner type="intermediary" />
 
         {/* Filters */}
         <div className="flex gap-2 mb-6 overflow-x-auto no-scrollbar">

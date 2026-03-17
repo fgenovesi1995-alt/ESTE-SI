@@ -104,6 +104,15 @@ const ChatDetail: React.FC = () => {
         ref={scrollRef}
         className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] bg-fixed"
       >
+        {/* Bypass Warning Banner */}
+        {(inputText.toLowerCase().includes('efectivo') || inputText.toLowerCase().includes('cash')) && (
+          <div className="sticky top-0 z-20 bg-red-50 dark:bg-red-900/30 border-b border-red-100 dark:border-red-800 p-3 flex gap-3 animate-in slide-in-from-top duration-300">
+            <span className="material-symbols-outlined text-red-600">warning</span>
+            <p className="text-[10px] text-red-800 dark:text-red-200 leading-tight">
+              <strong>⚠️ Alerta de Seguridad:</strong> Si pagás por fuera, perdés la <strong>Garantía de 15 días</strong> y la protección de Arreglados. No podremos intervenir ante reclamos.
+            </p>
+          </div>
+        )}
         <div className="flex justify-center mb-6">
           <p className="bg-gray-200/50 dark:bg-gray-800/80 backdrop-blur-sm text-gray-500 dark:text-gray-400 text-[10px] px-3 py-1 rounded-full font-bold uppercase tracking-widest">
             Hoy

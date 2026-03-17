@@ -16,7 +16,9 @@ const ProfileSettings: React.FC = () => {
     lastName: state.currentUser?.lastName || '',
     dni: state.currentUser?.dni || '',
     photo: state.currentUser?.photo || 'https://picsum.photos/seed/user/200',
-    profession: (state.currentUser as any)?.profession || ''
+    profession: (state.currentUser as any)?.profession || '',
+    cbuAlias: state.currentUser?.cbuAlias || '',
+    criminalRecordUrl: state.currentUser?.criminalRecordUrl || ''
   });
 
   const [cardData, setCardData] = useState({
@@ -125,17 +127,49 @@ const ProfileSettings: React.FC = () => {
             </div>
 
             {state.isProMode && (
-              <div>
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Título de tu Profesión (Opcional)</label>
-                <input
-                  type="text"
-                  disabled={!isEditing}
-                  placeholder="Ej: Electricista Matriculado"
-                  className="w-full mt-1 bg-gray-50 dark:bg-gray-800 border-none rounded-xl px-4 py-3 disabled:text-gray-400 text-sm"
-                  value={formData.profession}
-                  onChange={e => setFormData({ ...formData, profession: e.target.value })}
-                />
-              </div>
+              <>
+                <div>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">CBU / Alias (Para Cobros)</label>
+                  <input
+                    type="text"
+                    disabled={!isEditing}
+                    placeholder="Tu CBU o Alias de Mercado Pago/Banco"
+                    className="w-full mt-1 bg-gray-50 dark:bg-gray-800 border-none rounded-xl px-4 py-3 disabled:text-gray-400 text-sm font-mono"
+                    value={(formData as any).cbuAlias || ''}
+                    onChange={e => setFormData({ ...formData, cbuAlias: e.target.value } as any)}
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Certificado Antecedentes Penales</label>
+                  <div className="flex items-center gap-2 mt-1">
+                    <input
+                      type="text"
+                      disabled={true}
+                      placeholder="No cargado"
+                      className="flex-1 bg-gray-50 dark:bg-gray-800 border-none rounded-xl px-4 py-3 text-gray-400 text-sm"
+                      value={(formData as any).criminalRecordUrl ? '✅ Cargado' : '❌ Falta cargar'}
+                    />
+                    {isEditing && (
+                      <button className="bg-primary/10 text-primary px-4 py-3 rounded-xl text-xs font-bold">
+                        Subir PDF
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Título de tu Profesión (Opcional)</label>
+                  <input
+                    type="text"
+                    disabled={!isEditing}
+                    placeholder="Ej: Electricista Matriculado"
+                    className="w-full mt-1 bg-gray-50 dark:bg-gray-800 border-none rounded-xl px-4 py-3 disabled:text-gray-400 text-sm"
+                    value={formData.profession}
+                    onChange={e => setFormData({ ...formData, profession: e.target.value })}
+                  />
+                </div>
+              </>
             )}
           </div>
         </section>

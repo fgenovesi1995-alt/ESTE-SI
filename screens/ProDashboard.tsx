@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import Header from '../components/Header';
 import BottomNav from '../components/BottomNav';
+import LegalBanner from '../components/LegalBanner';
 
 const ProDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -35,10 +36,17 @@ const ProDashboard: React.FC = () => {
 
         {/* Metrics Grid */}
         <div className="grid grid-cols-3 gap-3 mb-8">
-          <div className="bg-white dark:bg-surface-dark p-3 rounded-2xl shadow-sm border border-emerald-100 dark:border-emerald-900">
-            <p className="text-[10px] text-gray-500 uppercase font-bold mb-1">Ganancias</p>
-            <p className="text-sm font-black text-emerald-600">${proProfile.earnings?.toLocaleString()}</p>
-          </div>
+          <button
+            onClick={() => navigate('/account')}
+            className="bg-white dark:bg-surface-dark p-3 rounded-2xl shadow-sm border border-emerald-100 dark:border-emerald-900 text-left active:scale-95 transition-all"
+          >
+            <p className="text-[10px] text-gray-500 uppercase font-bold mb-1 flex items-center gap-1">
+              Saldo <span className="material-symbols-outlined text-[10px]">arrow_forward</span>
+            </p>
+            <p className={`text-sm font-black ${(proProfile as any).current_balance < 0 ? 'text-red-500' : 'text-emerald-600'}`}>
+              ${((proProfile as any).current_balance || 0).toLocaleString()}
+            </p>
+          </button>
           <div className="bg-white dark:bg-surface-dark p-3 rounded-2xl shadow-sm border border-emerald-100 dark:border-emerald-900">
             <p className="text-[10px] text-gray-500 uppercase font-bold mb-1">Trabajos</p>
             <p className="text-sm font-black">{proProfile.completedJobs}</p>
@@ -49,6 +57,8 @@ const ProDashboard: React.FC = () => {
               {proProfile.rating} <span className="material-symbols-outlined text-xs text-yellow-500 filled">star</span>
             </p>
           </div>
+
+          <LegalBanner type="intermediary" />
         </div>
 
         {/* Available Tasks */}

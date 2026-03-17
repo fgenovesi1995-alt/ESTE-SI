@@ -18,6 +18,8 @@ interface AppContextType {
   getChatForPro: (proId: string) => Promise<Chat>;
   fetchNotifications: () => Promise<void>;
   createPaymentPreference: (taskId: string, amount: number, description: string) => Promise<string>;
+  finalizeTask: (taskId: string) => Promise<void>;
+  resolveDispute: (disputeId: string, resolution: 'pro' | 'user') => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -379,6 +381,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       fetchTasks();
       fetchChats();
       fetchNotifications();
+      checkAccountStatus();
 
       // Register for push notifications if on native platform
       if (Capacitor.isNativePlatform()) {
@@ -548,6 +551,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const updates: any = {};
     if (data.name) updates.first_name = data.name;
     if (data.lastName) updates.last_name = data.lastName;
+    if (data.dni) updates.dni = data.dni;
+    if (data.photo) updates.photo = data.photo;
+    if (data.cbuAlias) updates.cbu_alias = data.cbuAlias;
+    if (data.criminalRecordUrl) updates.criminal_record_url = data.criminalRecordUrl;
+    if (data.profession) updates.profession = data.profession;
 
     const { error } = await supabase
       .from('profiles')
@@ -657,9 +665,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const createPaymentPreference = async (taskId: string, amount: number, description: string): Promise<string> => {
     if (!state.currentUser) throw new Error("Auth required");
-    console.log("Creating payment preference for task:", taskId, "Amount:", amount);
+
+    // UI/Legal Banner Logic
+    const protectionFee = amount * 0.05;
+    const totalAmount = amount + protectionFee;
+
+    console.log("Creating escrow payment preference for task:", taskId, "Amount:", amount, "Protection Fee:", protectionFee);
+
     const { data, error } = await supabase.functions.invoke('mercadopago-payment', {
-      body: { taskId, amount, description, userEmail: state.currentUser.email }
+      body: {
+        taskId,
+        amount: totalAmount,
+        description: `${description} (Incluye Costo de Protección y Garantía)`,
+        userEmail: state.currentUser.email,
+        isEscrow: true
+      }
     });
 
     if (error) {
@@ -668,23 +688,141 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
 
     if (data?.error) {
-      console.error("Mercado Pago API Error returned in 200 response:", data);
-      const detailStr = data.details ? JSON.stringify(data.details) : data.error;
-      throw new Error("Mercado Pago dice: " + detailStr);
+      console.error("Mercado Pago API Error:", data);
+      throw new Error("Mercado Pago dice: " + data.error);
     }
 
     if (!data?.init_point) {
-      console.error("Invalid response format:", data);
       throw new Error("No se pudo obtener el link de pago.");
     }
     return data.init_point;
   };
 
+  const finalizeTask = async (taskId: string) => {
+    console.log("[AppContext] Finalizing task:", taskId);
+    // 1. Update task status to paid
+    const { error: taskError } = await supabase
+      .from('tasks')
+      .update({ status: 'paid' })
+      .eq('id', taskId);
+    if (taskError) throw taskError;
+
+    // 2. Fetch the transaction associated with this task
+    const { data: tx, error: txError } = await supabase
+      .from('transactions')
+      .select('*')
+      .eq('task_id', taskId)
+      .eq('type', 'payment')
+      .single();
+
+    if (tx) {
+      // Update transaction status to released
+      await supabase.from('transactions').update({ status: 'released' }).eq('id', tx.id);
+
+      let amountToCredit = tx.net_amount;
+
+      // --- Debt Recovery Logic ---
+      const { data: debts } = await supabase
+        .from('debt_history')
+        .select('*')
+        .eq('pro_id', tx.pro_id)
+        .gt('remaining_amount', 0)
+        .order('created_at', { ascending: true });
+
+      if (debts && debts.length > 0) {
+        console.log("[AppContext] Found debts for PRO. Applying recovery...");
+        for (const debt of debts) {
+          if (amountToCredit <= 0) break;
+
+          const settlement = Math.min(amountToCredit, debt.remaining_amount);
+          amountToCredit -= settlement;
+
+          const newRemaining = debt.remaining_amount - settlement;
+          await supabase.from('debt_history').update({
+            remaining_amount: newRemaining,
+            settled_at: newRemaining === 0 ? new Date().toISOString() : null
+          }).eq('id', debt.id);
+
+          console.log(`[AppContext] Debt ${debt.id} partially/fully settled with $${settlement}`);
+        }
+      }
+
+      // Update PRO balance (what's left after debt recovery)
+      const { data: proProfile } = await supabase.from('profiles').select('current_balance').eq('id', tx.pro_id).single();
+      const newBalance = (proProfile?.current_balance || 0) + amountToCredit;
+
+      await supabase.from('profiles').update({
+        current_balance: newBalance,
+        completed_jobs: supabase.rpc('increment', { row_id: tx.pro_id, column_name: 'completed_jobs' })
+      }).eq('id', tx.pro_id);
+    }
+    fetchTasks();
+  };
+
+  const resolveDispute = async (disputeId: string, resolution: 'pro' | 'user') => {
+    console.log("[AppContext] Resolving dispute:", disputeId, "Resolution:", resolution);
+    const { data: dispute } = await supabase.from('disputes').select('*').eq('id', disputeId).single();
+    if (!dispute) return;
+
+    if (resolution === 'user') {
+      // PRO abandoned/failed. Create DEBT.
+      const { data: tx } = await supabase.from('transactions').select('*').eq('task_id', dispute.task_id).single();
+      if (tx) {
+        // Create debt record
+        await supabase.from('debt_history').insert({
+          pro_id: dispute.pro_id,
+          user_id: dispute.user_id,
+          amount: tx.amount,
+          remaining_amount: tx.amount,
+          source_dispute_id: dispute.id
+        });
+
+        // Negative balance on PRO
+        const { data: pro } = await supabase.from('profiles').select('current_balance').eq('id', dispute.pro_id).single();
+        await supabase.from('profiles').update({
+          current_balance: (pro?.current_balance || 0) - tx.amount,
+          last_debt_date: new Date().toISOString()
+        }).eq('id', dispute.pro_id);
+      }
+    }
+
+    await supabase.from('disputes').update({ status: `resolved_${resolution}`, resolved_at: new Date().toISOString() }).eq('id', dispute.id);
+  };
+
+  const checkAccountStatus = async () => {
+    if (!state.currentUser || state.currentUser.role !== 'pro') return;
+
+    console.log("[AppContext] Checking account health for PRO:", state.currentUser.id);
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('current_balance, dispute_count, last_debt_date')
+      .eq('id', state.currentUser.id)
+      .single();
+
+    if (profile) {
+      let shouldSuspend = false;
+      const daysWithDebt = profile.last_debt_date ?
+        (Number(new Date()) - Number(new Date(profile.last_debt_date))) / (1000 * 60 * 60 * 24) : 0;
+
+      // AUTO-BAN RULES:
+      // 1. More than 2 unresolved claims
+      if (profile.dispute_count >= 2) shouldSuspend = true;
+      // 2. Debt older than 30 days
+      if (profile.current_balance < 0 && daysWithDebt > 30) shouldSuspend = true;
+
+      if (shouldSuspend) {
+        console.warn("[AppContext] !!! ACCOUNT SUSPENDED !!!");
+        await supabase.from('profiles').update({ is_suspended: true }).eq('id', state.currentUser.id);
+        setState(prev => ({ ...prev, currentUser: { ...prev.currentUser!, isSuspended: true } }));
+      }
+    }
+  };
+
   return (
     <AppContext.Provider value={{
       state, login, register, logout, updateUser, toggleProMode,
-      createTask, applyToTask, addCard, sendMessage, getChatForPro,
-      createPaymentPreference, fetchTasks, fetchNotifications, markNotificationsAsRead
+      createTask, applyToTask, sendMessage, getChatForPro, fetchNotifications,
+      createPaymentPreference, finalizeTask, resolveDispute, checkAccountStatus
     }}>
       {children}
     </AppContext.Provider>

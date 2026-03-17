@@ -7,7 +7,7 @@ import { Capacitor } from '@capacitor/core';
 
 const TasksHistory: React.FC = () => {
   const navigate = useNavigate();
-  const { state, createPaymentPreference, fetchTasks } = useApp();
+  const { state, createPaymentPreference, fetchTasks, finalizeTask } = useApp();
 
   const myTasks = state.isProMode
     ? state.tasks.filter(t => t.proId === state.currentUser?.id)
@@ -91,24 +91,68 @@ const TasksHistory: React.FC = () => {
                       {task.createdAt ? new Date(task.createdAt).toLocaleDateString() : '--/--/--'}
                     </p>
                   </div>
-                  {task.status === 'accepted' && (
-                    <div className="flex gap-4">
-                      <button
-                        onClick={() => navigate(`/chat/${state.isProMode ? task.userId : task.proId}`)}
-                        className="text-gray-500 text-xs font-bold flex items-center gap-1"
-                      >
-                        <span className="material-symbols-outlined text-sm">chat</span>
-                        Chat
-                      </button>
+                  {(task.status === 'accepted' || task.status === 'completed') && (
+                    <div className="flex flex-col items-end gap-3 w-full max-w-[200px]">
+                      <div className="flex items-center gap-2 mb-2">
+                        <input type="checkbox" id={`legal-${task.id}`} className="size-4 rounded border-gray-300 text-primary focus:ring-primary" />
+                        <label htmlFor={`legal-${task.id}`} className="text-[9px] text-gray-400 leading-tight">
+                          Entiendo que Arreglados es solo un intermediario y la responsabilidad es directa con el PRO.
+                        </label>
+                      </div>
 
+                      <div className="flex gap-4">
+                        <button
+                          onClick={() => navigate(`/chat/${state.isProMode ? task.userId : task.proId}`)}
+                          className="text-gray-500 text-xs font-bold flex items-center gap-1"
+                        >
+                          <span className="material-symbols-outlined text-sm">chat</span>
+                          Chat
+                        </button>
+
+                        {!state.isProMode && (
+                          <button
+                            onClick={() => {
+                              const checkbox = document.getElementById(`legal-${task.id}`) as HTMLInputElement;
+                              if (!checkbox.checked) {
+                                alert("Debes aceptar los términos de intermediación para proceder al pago.");
+                                return;
+                              }
+                              handlePayment(task);
+                            }}
+                            className="bg-primary text-white text-xs font-black px-6 py-3 rounded-2xl shadow-lg shadow-primary/20 active:scale-95 transition-all"
+                          >
+                            PAGAR CON GARANTÍA
+                          </button>
+                        )}
+                      </div>
+                      <p className="text-[8px] text-gray-400 text-right italic">
+                        * Tu pago queda en Escrow (Protección Arreglados) hasta que confirmes la finalización.
+                      </p>
+                    </div>
+                  )}
+                  {task.status === 'escrow' && (
+                    <div className="flex flex-col items-end gap-2">
+                      <span className="bg-yellow-50 text-yellow-700 text-[9px] font-bold px-2 py-1 rounded">FONDO EN ESCROW</span>
                       {!state.isProMode && (
                         <button
-                          onClick={() => handlePayment(task)}
-                          className="bg-primary text-white text-xs font-black px-6 py-3 rounded-2xl shadow-lg shadow-primary/20 active:scale-95 transition-all"
+                          className="bg-blue-600 text-white text-[10px] font-bold px-4 py-2 rounded-xl active:scale-95 shadow-lg shadow-blue-500/20"
+                          onClick={async () => {
+                            if (window.confirm("¿Confirmás que el trabajo finalizó correctamente? Se liberarán los fondos al profesional y no habrá reembolso posterior.")) {
+                              try {
+                                await finalizeTask(task.id);
+                                alert("¡Pago liberado exitosamente!");
+                              } catch (e: any) {
+                                alert("Error: " + e.message);
+                              }
+                            }
+                          }}
                         >
-                          PAGAR ${task.budget || 500}
+                          CONFIRMAR FINALIZACIÓN
                         </button>
                       )}
+                      <p className="text-[8px] text-gray-400 max-w-[150px] text-right">
+                        Al confirmar, liberas los fondos al PRO. La transacción se considera cerrada.
+                      </p>
                     </div>
                   )}
                 </div>

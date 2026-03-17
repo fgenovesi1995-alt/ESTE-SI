@@ -28,7 +28,13 @@ const UserHome: React.FC = () => {
 
   const premiumPros = state.professionals
     .filter(p => p.isPremium)
-    .sort((a, b) => b.rating - a.rating);
+    .sort((a, b) => {
+      const aDeudor = (a as any).current_balance < 0;
+      const bDeudor = (b as any).current_balance < 0;
+      if (aDeudor && !bDeudor) return 1;
+      if (!aDeudor && bDeudor) return -1;
+      return b.rating - a.rating;
+    });
 
   return (
     <div className="flex flex-col min-h-screen bg-background-light dark:bg-background-dark pb-24">

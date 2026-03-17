@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import BottomNav from '../components/BottomNav';
+import LegalBanner from '../components/LegalBanner';
 import { GoogleMap, useJsApiLoader, MarkerF, Autocomplete } from '@react-google-maps/api';
 import { getGeocode, getLatLng } from 'use-places-autocomplete';
 import { GOOGLE_MAPS_LIBRARIES } from '../services/googleMaps';
@@ -254,6 +255,9 @@ const CreateTask: React.FC = () => {
               </p>
             )}
           </div>
+
+          <LegalBanner type="escrow" />
+          <LegalBanner type="responsibility" />
 
           <button
             type="submit"

@@ -22,6 +22,13 @@ export interface User {
     lng: number;
   };
   pushToken?: string;
+  currentBalance?: number;
+  disputeCount?: number;
+  isSuspended?: boolean;
+  kycStatus?: 'none' | 'pending' | 'verified' | 'rejected';
+  criminalRecordUrl?: string;
+  cbuAlias?: string;
+  profession?: string;
 }
 
 export interface Professional {
@@ -54,7 +61,7 @@ export interface Task {
     lat: number;
     lng: number;
   };
-  status: 'pending' | 'accepted' | 'completed' | 'paid';
+  status: 'pending' | 'accepted' | 'completed' | 'paid' | 'escrow' | 'disputed';
   createdAt: string;
 }
 
