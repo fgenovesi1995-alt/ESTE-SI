@@ -11,10 +11,20 @@ const ProDashboard: React.FC = () => {
   const { state, applyToTask } = useApp();
 
   const availableTasks = state.tasks.filter(t => t.status === 'pending');
-  const proProfile = state.professionals.find(p => p.id === 'p1') || state.professionals[0];
+  // Use current user directly if it's a PRO
+  const proProfile = state.currentUser;
+
+  const [showTransparency, setShowTransparency] = React.useState(() => {
+    return !sessionStorage.getItem('transparency_accepted');
+  });
+
+  const handleAcceptTransparency = () => {
+    sessionStorage.setItem('transparency_accepted', 'true');
+    setShowTransparency(false);
+  };
 
   return (
-    <div className="flex flex-col min-h-screen bg-emerald-50 dark:bg-background-dark pb-24">
+    <div className="flex flex-col h-screen bg-emerald-50 dark:bg-background-dark">
       {/* Visual Identity Override: Primary is now Emerald */}
       <style>{`
         :root { --primary: #10b981; }
@@ -24,7 +34,7 @@ const ProDashboard: React.FC = () => {
 
       <Header />
 
-      <main className="flex-1 px-4 py-6">
+      <main className="flex-1 px-4 py-6 overflow-y-auto no-scrollbar pb-32">
         <div className="mb-6 flex items-center justify-between">
           <div>
             <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">
@@ -43,22 +53,20 @@ const ProDashboard: React.FC = () => {
             <p className="text-[10px] text-gray-500 uppercase font-bold mb-1 flex items-center gap-1">
               Saldo <span className="material-symbols-outlined text-[10px]">arrow_forward</span>
             </p>
-            <p className={`text-sm font-black ${(proProfile as any).current_balance < 0 ? 'text-red-500' : 'text-emerald-600'}`}>
-              ${((proProfile as any).current_balance || 0).toLocaleString()}
+            <p className={`text-sm font-black ${(proProfile as any)?.current_balance < 0 ? 'text-red-500' : 'text-emerald-600'}`}>
+              ${((proProfile as any)?.current_balance || 0).toLocaleString()}
             </p>
           </button>
           <div className="bg-white dark:bg-surface-dark p-3 rounded-2xl shadow-sm border border-emerald-100 dark:border-emerald-900">
             <p className="text-[10px] text-gray-500 uppercase font-bold mb-1">Trabajos</p>
-            <p className="text-sm font-black">{proProfile.completedJobs}</p>
+            <p className="text-sm font-black">{(proProfile as any)?.completed_jobs || 0}</p>
           </div>
           <div className="bg-white dark:bg-surface-dark p-3 rounded-2xl shadow-sm border border-emerald-100 dark:border-emerald-900">
             <p className="text-[10px] text-gray-500 uppercase font-bold mb-1">Rating</p>
             <p className="text-sm font-black flex items-center gap-1">
-              {proProfile.rating} <span className="material-symbols-outlined text-xs text-yellow-500 filled">star</span>
+              {(proProfile as any)?.completed_jobs > 0 ? ((proProfile as any)?.rating || 0).toFixed(1) : '0.0'} <span className="material-symbols-outlined text-xs text-yellow-500 filled">star</span>
             </p>
           </div>
-
-          <LegalBanner type="intermediary" />
         </div>
 
         {/* Available Tasks */}
@@ -122,6 +130,28 @@ const ProDashboard: React.FC = () => {
       </main>
 
       <BottomNav />
+
+      {/* Transparency Modal */}
+      {showTransparency && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white dark:bg-surface-dark w-full max-w-sm rounded-[32px] p-8 shadow-2xl animate-in fade-in zoom-in duration-300">
+            <div className="size-16 bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center mb-6 mx-auto">
+              <span className="material-symbols-outlined text-3xl text-emerald-600">gavel</span>
+            </div>
+            <h2 className="text-xl font-bold text-center mb-4">Transparencia Arreglados</h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 text-center leading-relaxed mb-8">
+              Arreglados es un facilitador tecnológico que solo facilita el contacto.
+              <span className="block mt-2 font-bold text-emerald-600">No somos empleadores ni contratistas de los profesionales.</span>
+            </p>
+            <button
+              onClick={handleAcceptTransparency}
+              className="w-full bg-emerald-600 text-white font-bold py-4 rounded-2xl shadow-lg shadow-emerald-500/20 active:scale-95 transition-all"
+            >
+              Entendido y Aceptar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

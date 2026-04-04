@@ -1,12 +1,16 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 
 const AccountStatement: React.FC = () => {
   const navigate = useNavigate();
-  const { state } = useApp();
+  const { state, fetchTransactions } = useApp();
   const user = state.currentUser;
+
+  useEffect(() => {
+    fetchTransactions();
+  }, []);
 
   // Manual calculation of balance if not yet in state (or use existing earnings as fallback)
   const balance = (user as any)?.current_balance || 0;
@@ -45,7 +49,7 @@ const AccountStatement: React.FC = () => {
         {/* Protection Fee Info */}
         <div className="bg-blue-50 dark:bg-blue-900/20 p-5 rounded-3xl border border-blue-100 dark:border-blue-800 flex gap-4">
           <div className="size-12 bg-primary rounded-2xl flex items-center justify-center text-white shrink-0 shadow-lg shadow-primary/20">
-             <span className="material-symbols-outlined">security</span>
+            <span className="material-symbols-outlined">security</span>
           </div>
           <div>
             <h4 className="text-sm font-bold text-blue-900 dark:text-blue-100 mb-1">Costo de Protección y Garantía</h4>
@@ -54,6 +58,62 @@ const AccountStatement: React.FC = () => {
             </p>
           </div>
         </div>
+
+        {/* Transaction History */}
+        <section>
+          <h3 className="text-sm font-black uppercase tracking-wider text-gray-400 mb-4 ml-2">Historial de Movimientos</h3>
+          <div className="space-y-3">
+            {state.transactions.length === 0 ? (
+              <div className="bg-white dark:bg-surface-dark p-8 rounded-3xl border border-dashed border-gray-200 dark:border-gray-800 text-center text-gray-400">
+                <p className="text-sm font-medium">No hay movimientos registrados.</p>
+              </div>
+            ) : (
+              state.transactions.map(tx => {
+                const isCommission = tx.type === 'commission';
+                const isIncome = tx.proId === user?.id && !isCommission;
+
+                return (
+                  <div key={tx.id} className="bg-white dark:bg-surface-dark p-5 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800">
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1">
+                          {isCommission ? 'Comisión Plataforma' : (isIncome ? 'Trabajo Realizado' : 'Pago Realizado')}
+                        </p>
+                        <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                          {isCommission ? 'Costo de Protección y Garantía' : `Servicio #${tx.id.slice(0, 8)}`}
+                        </p>
+                      </div>
+                      <p className={`text-md font-black ${isIncome ? 'text-emerald-600' : 'text-red-500'}`}>
+                        {isIncome ? '+' : '-'}${tx.amount.toLocaleString()}
+                      </p>
+                    </div>
+
+                    {!isCommission && isIncome && (
+                      <div className="mt-3 pt-3 border-t border-gray-50 dark:border-gray-800 space-y-1">
+                        <div className="flex justify-between text-[10px]">
+                          <span className="text-gray-400">Bruto del trabajo:</span>
+                          <span className="font-bold">${tx.amount.toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between text-[10px]">
+                          <span className="text-gray-400">Protección Arreglados (5%):</span>
+                          <span className="font-bold text-red-500">-${(tx.amount * 0.05).toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between text-[11px] pt-1 border-t border-gray-50 dark:border-gray-800">
+                          <span className="font-black text-emerald-600">Neto acreditado:</span>
+                          <span className="font-black text-emerald-600">${(tx.amount * 0.95).toLocaleString()}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    <p className="text-[9px] text-gray-400 mt-2 font-medium">
+                      {new Date(tx.createdAt).toLocaleDateString()} • {new Date(tx.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </section>
 
         {/* Payout Policy */}
         <div className="bg-white dark:bg-surface-dark p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm">
@@ -74,17 +134,6 @@ const AccountStatement: React.FC = () => {
               <span className="material-symbols-outlined text-gray-300">account_balance</span>
             </div>
           </div>
-        </div>
-
-        {/* Legal Disclaimer */}
-        <div className="bg-gray-50 dark:bg-gray-800/50 p-6 rounded-3xl border border-dashed border-gray-200 dark:border-gray-700">
-           <h3 className="text-xs font-bold text-gray-500 mb-3 flex items-center gap-2">
-             <span className="material-symbols-outlined text-sm">gavel</span>
-             NATURALEZA JURÍDICA
-           </h3>
-           <p className="text-[9px] text-gray-400 leading-relaxed italic">
-             "Arreglados" es un facilitador tecnológico. Al usar la plataforma, aceptás que la app no garantiza el resultado técnico ni estético del trabajo, actuando solo como intermediario y gestor de reputación. La responsabilidad técnica y civil es 100% del profesional independiente.
-           </p>
         </div>
       </main>
     </div>

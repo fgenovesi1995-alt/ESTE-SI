@@ -2,7 +2,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-maps/api';
+import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF } from '@react-google-maps/api';
 import { GOOGLE_MAPS_LIBRARIES } from '../services/googleMaps';
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
@@ -20,7 +20,7 @@ const MapView: React.FC = () => {
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
-  const CATEGORIES = ['Electricidad', 'Plomería', 'Pintura', 'Limpieza', 'Jardinería', 'Cerrajería', 'Mudanzas'];
+  const CATEGORIES = ['Electricidad', 'Plomería', 'Pintura', 'Limpieza', 'Jardinería', 'Cerrajería', 'Mudanzas', 'Electrónica'];
 
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script',
@@ -46,6 +46,14 @@ const MapView: React.FC = () => {
   const onUnmount = useCallback(function callback(map: google.maps.Map) {
     setMap(null);
   }, []);
+
+  const getInitials = (name: string) => {
+    return name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+  };
+
+  const isValidCoord = (loc: any) => {
+    return loc && typeof loc === 'object' && typeof loc.lat === 'number' && typeof loc.lng === 'number' && isFinite(loc.lat) && isFinite(loc.lng);
+  };
 
   return (
     <div className="h-screen flex flex-col bg-gray-100">
@@ -93,7 +101,7 @@ const MapView: React.FC = () => {
         {isLoaded ? (
           <GoogleMap
             mapContainerStyle={containerStyle}
-            center={coords}
+            center={isValidCoord(coords) ? coords : { lat: -34.6037, lng: -58.3816 }}
             zoom={14}
             onLoad={onLoad}
             onUnmount={onUnmount}
@@ -108,27 +116,57 @@ const MapView: React.FC = () => {
               ]
             }}
           >
-            {filteredPros.map((pro) => (
-              <Marker
-                key={pro.id}
-                position={pro.location || { lat: coords.lat + (Math.random() - 0.5) * 0.01, lng: coords.lng + (Math.random() - 0.5) * 0.01 }}
-                onClick={() => setSelectedPro(pro)}
-              />
-            ))}
+            {filteredPros.map((pro) => {
+              const position = isValidCoord(pro.location)
+                ? pro.location
+                : { lat: coords.lat + (Math.random() - 0.5) * 0.01, lng: coords.lng + (Math.random() - 0.5) * 0.01 };
 
-            {selectedPro && (
-              <InfoWindow
-                position={selectedPro.location || { lat: coords.lat, lng: coords.lng }}
-                onCloseClick={() => setSelectedPro(null)}
-              >
-                <div className="p-2 flex flex-col items-center min-w-[120px]" onClick={() => navigate(`/pro/${selectedPro.id}`)}>
-                  <img src={selectedPro.photo} className="size-12 rounded-full object-cover mb-2 border-2 border-primary/20" />
-                  <p className="text-xs font-bold text-gray-900">{selectedPro.name}</p>
-                  <p className="text-[10px] text-primary font-bold tracking-tighter">{selectedPro.category}</p>
-                  <button className="mt-2 text-[10px] bg-primary text-white px-3 py-1 rounded-full font-bold">Ver perfil</button>
-                </div>
-              </InfoWindow>
-            )}
+              return (
+                <MarkerF
+                  key={pro.id}
+                  position={position}
+                  onClick={() => setSelectedPro(pro)}
+                  icon={{
+                    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+                      <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="20" cy="20" r="18" fill="#3b82f6" stroke="white" stroke-width="2.5"/>
+                        <text x="20" y="21" text-anchor="middle" dominant-baseline="middle" fill="white" font-family="Arial, sans-serif" font-size="13px" font-weight="900">${getInitials(pro.name)}</text>
+                      </svg>
+                    `)}`,
+                    scaledSize: new google.maps.Size(40, 40),
+                    anchor: new google.maps.Point(20, 20)
+                  }}
+                >
+                  {selectedPro?.id === pro.id && (
+                    <InfoWindowF
+                      onCloseClick={() => setSelectedPro(null)}
+                    >
+                      <div
+                        className="p-3 flex flex-col items-center min-w-[140px] bg-white rounded-2xl"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                        }}
+                      >
+                        <img src={selectedPro.photo} className="size-14 rounded-full object-cover mb-3 border-2 border-primary/20 shadow-sm" />
+                        <p className="text-xs font-black text-gray-900 mb-0.5">{selectedPro.name}</p>
+                        <p className="text-[10px] text-primary font-black uppercase tracking-tighter mb-3">{selectedPro.category}</p>
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            console.log("Navigating to profile:", selectedPro.id);
+                            navigate(`/profile/${selectedPro.id}`);
+                          }}
+                          className="w-full bg-primary text-white text-[10px] font-black py-2 rounded-xl shadow-md active:scale-95 transition-all text-center"
+                        >
+                          VER PERFIL
+                        </button>
+                      </div>
+                    </InfoWindowF>
+                  )}
+                </MarkerF>
+              );
+            })}
           </GoogleMap>
         ) : (
           <div className="text-center p-10 flex flex-col items-center gap-4">

@@ -1,5 +1,6 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
-import { User, Task, Chat, Professional, AppState, Role, Message, Card, InAppNotification } from '../types';
+import { User, Task, Chat, Professional, AppState, Role, Message, Card, InAppNotification, Transaction, Review } from '../types';
 import { supabase } from '../services/supabase';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { Capacitor } from '@capacitor/core';
@@ -7,7 +8,7 @@ import { Capacitor } from '@capacitor/core';
 interface AppContextType {
   state: AppState;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, role: Role, name: string) => Promise<void>;
+  register: (email: string, password: string, role: Role, name: string, dni: string) => Promise<void>;
   logout: () => Promise<void>;
   updateUser: (data: Partial<User>) => Promise<void>;
   toggleProMode: () => void;
@@ -20,6 +21,13 @@ interface AppContextType {
   createPaymentPreference: (taskId: string, amount: number, description: string) => Promise<string>;
   finalizeTask: (taskId: string) => Promise<void>;
   resolveDispute: (disputeId: string, resolution: 'pro' | 'user') => Promise<void>;
+  fetchTransactions: () => Promise<void>;
+  fetchReviews: (userId?: string) => Promise<void>;
+  rateProfessional: (taskId: string, proId: string, rating: number, comment: string) => Promise<void>;
+  rateUser: (taskId: string, userId: string, rating: number, comment: string) => Promise<void>;
+  markNotificationsAsRead: () => Promise<void>;
+  markNotificationAsRead: (id: string) => Promise<void>;
+  checkAccountStatus: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -32,13 +40,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     professionals: [],
     profiles: [],
     notifications: [],
+    transactions: [],
+    reviews: [],
     isProMode: false,
     isInitialized: false
   });
 
   const profileFetchPromise = useRef<Promise<User | null> | null>(null);
-
-  // --- Utility Functions ---
 
   const safeDate = (dateStr: any) => {
     if (!dateStr) return new Date().toISOString();
@@ -48,19 +56,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const fetchProfessionals = async () => {
     try {
-      const { data } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('role', 'pro');
-
+      const { data } = await supabase.from('profiles').select('*').eq('role', 'pro');
       if (data) {
         const pros: Professional[] = data.map(p => ({
           id: p.id,
           name: `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Profesional',
           category: p.category || 'General',
-          rating: p.rating || 5.0,
+          rating: p.completed_jobs > 0 ? (p.rating || 0) : 0,
           isPremium: p.is_premium || false,
-          location: 'Ubicación Pro',
+          location: p.location, // Fix: Use real location from DB
           bio: p.bio || '',
           photo: p.photo || 'https://picsum.photos/seed/pro/200',
           reviewsCount: p.reviews_count || 0,
@@ -77,31 +81,25 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const fetchTasks = async () => {
     try {
-      console.log("[AppContext] Fetching tasks with profiles...");
       const { data, error } = await supabase
         .from('tasks')
         .select(`
           *,
           creator:profiles!tasks_user_id_fkey(first_name, last_name, photo),
-          pro:profiles!tasks_pro_id_fkey(first_name, last_name, photo)
+          pro:profiles!tasks_pro_id_fkey(first_name, last_name, photo),
+          reviews(*)
         `)
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error("Supabase fetchTasks error:", error.message);
-        return;
-      }
-
-      if (data) {
+      if (!error && data) {
         const tasks: Task[] = data.map(t => {
           const creator = t.creator as any;
           const proProfile = t.pro as any;
-
           return {
             id: t.id,
             userId: t.user_id,
             userName: creator ? `${creator.first_name || ''} ${creator.last_name || ''}`.trim() || 'Usuario' : 'Usuario',
-            userLastName: '', // We already concatenated it into name for simplicity in UI
+            userLastName: '',
             proId: t.pro_id,
             proName: proProfile ? `${proProfile.first_name || ''} ${proProfile.last_name || ''}`.trim() || 'Profesional' : 'Profesional',
             proLastName: '',
@@ -110,14 +108,68 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             photo: t.photo,
             location: t.location,
             status: t.status,
-            createdAt: t.created_at
+            createdAt: t.created_at,
+            reviews: t.reviews || []
           };
         });
-        console.log(`[AppContext] Fetched ${tasks.length} tasks successfully.`);
         setState(prev => ({ ...prev, tasks }));
       }
     } catch (e) {
       console.error("General error in fetchTasks:", e);
+    }
+  };
+
+  const fetchTransactions = async () => {
+    if (!state.currentUser) return;
+    try {
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('*')
+        .or(`user_id.eq.${state.currentUser.id},pro_id.eq.${state.currentUser.id}`)
+        .order('created_at', { ascending: false });
+      if (!error && data) {
+        const transactions: Transaction[] = data.map(t => ({
+          id: t.id,
+          taskId: t.task_id,
+          userId: t.user_id,
+          proId: t.pro_id,
+          amount: t.amount,
+          feeAmount: t.fee_amount || 0,
+          netAmount: t.net_amount || 0,
+          type: t.type,
+          status: t.status,
+          createdAt: t.created_at
+        }));
+        setState(prev => ({ ...prev, transactions }));
+      }
+    } catch (e) {
+      console.error("Error fetching transactions:", e);
+    }
+  };
+
+  const fetchReviews = async (userId?: string) => {
+    const targetId = userId || state.currentUser?.id;
+    if (!targetId) return;
+    try {
+      const { data, error } = await supabase
+        .from('reviews')
+        .select('*')
+        .eq('reviewed_id', targetId)
+        .order('created_at', { ascending: false });
+      if (!error && data) {
+        const reviews: Review[] = data.map(r => ({
+          id: r.id,
+          taskId: r.task_id,
+          reviewerId: r.reviewer_id,
+          reviewedId: r.reviewed_id,
+          rating: r.rating,
+          comment: r.comment,
+          createdAt: r.created_at
+        }));
+        setState(prev => ({ ...prev, reviews }));
+      }
+    } catch (e) {
+      console.error("Error fetching reviews:", e);
     }
   };
 
@@ -126,14 +178,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     try {
       const { data: chatData, error } = await supabase
         .from('chats')
-        .select(`
-          *,
-          messages(*)
-        `)
+        .select(`*, messages(*)`)
         .contains('participants', [state.currentUser.id]);
 
       if (!error && chatData) {
-        console.log(`[AppContext] Fetched ${chatData.length} chats successfully.`);
         const chats: Chat[] = chatData.map(c => ({
           id: c.id,
           participants: c.participants,
@@ -146,21 +194,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }));
         setState(prev => ({ ...prev, chats }));
 
-        // Fetch missing profiles for participants
         const allParticipantIds = Array.from(new Set(chats.flatMap(c => c.participants)));
         const missingIds = allParticipantIds.filter(id => id !== state.currentUser?.id);
 
         if (missingIds.length > 0) {
-          console.log("[AppContext] Fetching missing profiles for participants:", missingIds);
           const { data: profilesData } = await supabase
             .from('profiles')
             .select('id, first_name, last_name, photo, role, category, rating, is_premium, bio, reviews_count, price_per_hour, earnings, completed_jobs')
             .in('id', missingIds);
 
-          const profiles = profilesData as any[];
-
-          if (profiles) {
-            console.log(`[AppContext] Fetched ${profiles.length} participant profiles.`);
+          if (profilesData) {
+            const profiles = profilesData as any[];
             const users: User[] = profiles.map(p => ({
               id: p.id,
               name: `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Usuario',
@@ -178,20 +222,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               const newProfiles = [...prev.profiles];
               users.forEach(u => {
                 const existingIndex = newProfiles.findIndex(p => p.id === u.id);
-                if (existingIndex === -1) {
-                  newProfiles.push(u);
-                } else {
-                  newProfiles[existingIndex] = u; // Ensure we update the name/photo
-                }
+                if (existingIndex === -1) newProfiles.push(u);
+                else newProfiles[existingIndex] = u;
               });
 
               const fetchedPros = profiles.filter(p => p.role === 'pro').map(p => ({
                 id: p.id,
                 name: `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Profesional',
                 category: p.category || 'General',
-                rating: p.rating || 5.0,
+                rating: p.completed_jobs > 0 ? (p.rating || 0) : 0,
                 isPremium: p.is_premium || false,
-                location: 'Ubicación Pro',
+                location: p.location, // Fix: Use real location from DB
                 bio: p.bio || '',
                 photo: p.photo || 'https://picsum.photos/seed/pro/200',
                 reviewsCount: p.reviews_count || 0,
@@ -203,11 +244,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               const newPros = [...prev.professionals];
               fetchedPros.forEach(fp => {
                 const existingIndex = newPros.findIndex(p => p.id === fp.id);
-                if (existingIndex === -1) {
-                  newPros.push(fp);
-                } else {
-                  newPros[existingIndex] = fp; // Update existing
-                }
+                if (existingIndex === -1) newPros.push(fp);
+                else newPros[existingIndex] = fp;
               });
 
               return { ...prev, profiles: newProfiles, professionals: newPros };
@@ -223,14 +261,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const fetchNotifications = async () => {
     if (!state.currentUser) return;
     try {
-      console.log("[AppContext] Fetching notifications...");
       const { data, error } = await supabase
         .from('notifications')
         .select('*')
         .eq('user_id', state.currentUser.id)
         .order('created_at', { ascending: false });
-
-      if (error) throw error;
       if (data) {
         const notifications: InAppNotification[] = data.map(n => ({
           id: n.id,
@@ -250,45 +285,35 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const markNotificationsAsRead = async () => {
     if (!state.currentUser) return;
     try {
-      const { error } = await supabase
-        .from('notifications')
-        .update({ read: true })
-        .eq('user_id', state.currentUser.id);
-
-      if (!error) {
-        setState(prev => ({
-          ...prev,
-          notifications: prev.notifications.map(n => ({ ...n, read: true }))
-        }));
-      }
+      await supabase.from('notifications').update({ read: true }).eq('user_id', state.currentUser.id);
+      setState(prev => ({
+        ...prev,
+        notifications: prev.notifications.map(n => ({ ...n, read: true }))
+      }));
     } catch (e) {
-      console.error("[AppContext] markNotificationsAsRead error:", e);
+      console.error("Error marking notifications as read:", e);
     }
   };
 
-  // --- core Auth logic ---
+  const markNotificationAsRead = async (id: string) => {
+    try {
+      await supabase.from('notifications').update({ read: true }).eq('id', id);
+      setState(prev => ({
+        ...prev,
+        notifications: prev.notifications.map(n => n.id === id ? { ...n, read: true } : n)
+      }));
+    } catch (e) {
+      console.error("Error marking notification as read:", e);
+    }
+  };
 
   const fetchProfileInternal = async (userId: string): Promise<User | null> => {
-    // Safety timeout to avoid hanging the app
     const safetyTimeout = setTimeout(() => {
       setState(prev => prev.isInitialized ? prev : { ...prev, isInitialized: true });
     }, 8000);
-
     try {
-      console.log("Fetching profile from DB for UID:", userId);
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-
-      if (error) {
-        console.error("Supabase profile error:", error.message);
-        return null;
-      }
-
-      if (data) {
-        console.log("Profile loaded successfully.");
+      const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
+      if (!error && data) {
         return {
           id: data.id,
           name: data.first_name || '',
@@ -302,12 +327,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           pushToken: data.push_token
         };
       }
-    } catch (err: any) {
-      if (err.name === 'AbortError') {
-        console.warn("Profile fetch aborted (harmless).");
-      } else {
-        console.error("Profile exception:", err);
-      }
+    } catch (err) {
+      console.error("Profile exception:", err);
     } finally {
       clearTimeout(safetyTimeout);
     }
@@ -315,63 +336,29 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const fetchProfile = async (userId: string): Promise<User | null> => {
-    // If we're already fetching, return the existing promise
-    if (profileFetchPromise.current) {
-      console.log("Re-using existing profile fetch promise...");
-      return profileFetchPromise.current;
-    }
-
+    if (profileFetchPromise.current) return profileFetchPromise.current;
     profileFetchPromise.current = fetchProfileInternal(userId);
     const user = await profileFetchPromise.current;
-    profileFetchPromise.current = null; // Clear lock
-
+    profileFetchPromise.current = null;
     if (user) {
-      setState(prev => ({
-        ...prev,
-        currentUser: user,
-        isProMode: user.role === 'pro',
-        isInitialized: true
-      }));
+      setState(prev => ({ ...prev, currentUser: user, isProMode: user.role === 'pro', isInitialized: true }));
     } else {
-      // If we couldn't get the profile, we still need to unblock the UI
       setState(prev => ({ ...prev, isInitialized: true }));
     }
-
     return user;
   };
 
-  // --- Auth Listeners ---
-
   useEffect(() => {
-    console.log("Initializing App Context...");
-
-    // 1. Check initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        console.log("Found existing session on boot.");
-        fetchProfile(session.user.id);
-      } else {
-        console.log("No initial session found.");
-        setState(prev => ({ ...prev, isInitialized: true }));
-      }
+      if (session?.user) fetchProfile(session.user.id);
+      else setState(prev => ({ ...prev, isInitialized: true }));
     });
-
-    // 2. Setup auth listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("Auth event fired:", event);
-      if (session?.user) {
-        fetchProfile(session.user.id);
-      } else if (event === 'SIGNED_OUT') {
-        setState(prev => ({
-          ...prev,
-          currentUser: null,
-          tasks: [],
-          chats: [],
-          isInitialized: true
-        }));
+      if (session?.user) fetchProfile(session.user.id);
+      else if (event === 'SIGNED_OUT') {
+        setState(prev => ({ ...prev, currentUser: null, tasks: [], chats: [], isInitialized: true }));
       }
     });
-
     fetchProfessionals();
     return () => subscription.unsubscribe();
   }, []);
@@ -382,53 +369,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       fetchChats();
       fetchNotifications();
       checkAccountStatus();
-
-      // Register for push notifications if on native platform
-      if (Capacitor.isNativePlatform()) {
-        registerPushNotifications();
-      }
+      if (Capacitor.isNativePlatform()) registerPushNotifications();
     }
   }, [state.currentUser?.id]);
 
   useEffect(() => {
     if (!state.currentUser) return;
-
-    console.log("[AppContext] Setting up real-time subscriptions for user:", state.currentUser.id);
-
-    // 1. Chat Sub (messages)
-    const chatSub = supabase
-      .channel('chat_updates')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
-        console.log("[AppContext] REALTIME MESSAGE RECEIVED:", payload.new);
-        setTimeout(() => fetchChats(), 500);
-      })
-      .subscribe();
-
-    // 2. Task Sub (status updates)
-    const taskSub = supabase
-      .channel('task_updates')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'tasks' }, (payload) => {
-        console.log("[AppContext] REALTIME TASK UPDATE RECEIVED:", payload.new);
-        fetchTasks();
-      })
-      .subscribe();
-
-    // 3. Notification Sub
-    const notifSub = supabase
-      .channel('notification_updates')
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'notifications',
-        filter: `user_id=eq.${state.currentUser.id}`
-      }, (payload) => {
-        console.log("[AppContext] REALTIME NOTIFICATION RECEIVED:", payload.new);
-        fetchNotifications();
-      })
-      .subscribe();
-
+    const chatSub = supabase.channel('chat_updates').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => setTimeout(() => fetchChats(), 500)).subscribe();
+    const taskSub = supabase.channel('task_updates').on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'tasks' }, () => fetchTasks()).subscribe();
+    const notifSub = supabase.channel('notification_updates').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${state.currentUser.id}` }, () => fetchNotifications()).subscribe();
     return () => {
-      console.log("[AppContext] Cleaning up subscriptions...");
       supabase.removeChannel(chatSub);
       supabase.removeChannel(taskSub);
       supabase.removeChannel(notifSub);
@@ -436,115 +386,44 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, [state.currentUser?.id]);
 
   const registerPushNotifications = async () => {
-    console.log("Starting push notification registration process...");
     let permStatus = await PushNotifications.checkPermissions();
-    console.log("Current push permissions:", permStatus.receive);
-
-    if (permStatus.receive === 'prompt') {
-      console.log("Requesting push permissions...");
-      permStatus = await PushNotifications.requestPermissions();
-      console.log("New push permissions:", permStatus.receive);
-    }
-
-    if (permStatus.receive !== 'granted') {
-      console.warn("User denied push notification permissions");
-      return;
-    }
-
-    // Add listeners BEFORE registering
-    console.log("Adding push listeners...");
-    await PushNotifications.addListener('registration', (token) => {
-      console.log('Push registration success, token:', token.value);
-      savePushToken(token.value);
-    });
-
-    await PushNotifications.addListener('registrationError', (error) => {
-      console.error('Push registration error:', error.error);
-    });
-
-    await PushNotifications.addListener('pushNotificationReceived', (notification) => {
-      console.log('Push notification received:', notification);
-    });
-
-    console.log("Calling PushNotifications.register()...");
+    if (permStatus.receive === 'prompt') permStatus = await PushNotifications.requestPermissions();
+    if (permStatus.receive !== 'granted') return;
+    await PushNotifications.addListener('registration', (token) => savePushToken(token.value));
     await PushNotifications.register();
   };
 
   const savePushToken = async (token: string) => {
-    if (!state.currentUser) {
-      console.warn("Cannot save push token: No currentUser found in state.");
-      return;
-    }
-    console.log(`Updating push_token for user ${state.currentUser.id}...`);
-    const { error } = await supabase
-      .from('profiles')
-      .update({ push_token: token })
-      .eq('id', state.currentUser.id);
-
-    if (!error) {
-      console.log("Push token saved successfully to Supabase.");
-      setState(prev => ({
-        ...prev,
-        currentUser: { ...prev.currentUser!, pushToken: token }
-      }));
-    } else {
-      console.error("FATAL ERROR saving push token to Supabase:", error.message, error.details);
-    }
+    if (!state.currentUser) return;
+    const { error } = await supabase.from('profiles').update({ push_token: token }).eq('id', state.currentUser.id);
+    if (!error) setState(prev => ({ ...prev, currentUser: { ...prev.currentUser!, pushToken: token } }));
   };
-
-  // --- Exposed Provider Methods ---
 
   const login = async (email: string, password: string) => {
-    console.log("Attempting sign in...");
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      console.error("Login failed:", error.message);
-      throw error;
-    }
-
-    if (data.session?.user) {
-      console.log("Sign in success, waiting for profile...");
-      await fetchProfile(data.session.user.id);
-    }
+    if (error) throw error;
+    if (data.session?.user) await fetchProfile(data.session.user.id);
   };
 
-  const register = async (email: string, password: string, role: Role, name: string) => {
-    const { error, data } = await supabase.auth.signUp({
-      email, password, options: { data: { role, name } }
-    });
+  const register = async (email: string, password: string, role: Role, name: string, dni: string) => {
+    const { error, data } = await supabase.auth.signUp({ email, password, options: { data: { role, name, dni } } });
     if (error) throw error;
-
     if (data.session?.user) {
-      // Wait a bit for DB trigger
       await new Promise(r => setTimeout(r, 1500));
       const user = await fetchProfile(data.session.user.id);
       if (!user) {
-        console.log("Trigger delayed, creating profile manually...");
-        const { error: profileError } = await supabase.from('profiles').insert({
-          id: data.session.user.id,
-          email: data.session.user.email,
-          first_name: name,
-          role: role
-        });
-        if (!profileError) await fetchProfile(data.session.user.id);
+        await supabase.from('profiles').insert({ id: data.session.user.id, email: data.session.user.email, first_name: name, dni: dni, role: role });
+        await fetchProfile(data.session.user.id);
       }
     }
   };
 
   const logout = async () => {
     await supabase.auth.signOut();
-    setState(prev => ({
-      ...prev,
-      currentUser: null,
-      tasks: [],
-      chats: [],
-      isProMode: false
-    }));
+    setState(prev => ({ ...prev, currentUser: null, tasks: [], chats: [], isProMode: false }));
   };
 
-  const toggleProMode = () => {
-    setState(prev => ({ ...prev, isProMode: !prev.isProMode }));
-  };
+  const toggleProMode = () => setState(prev => ({ ...prev, isProMode: !prev.isProMode }));
 
   const updateUser = async (data: Partial<User>) => {
     if (!state.currentUser) return;
@@ -556,91 +435,55 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (data.cbuAlias) updates.cbu_alias = data.cbuAlias;
     if (data.criminalRecordUrl) updates.criminal_record_url = data.criminalRecordUrl;
     if (data.profession) updates.profession = data.profession;
-
-    const { error } = await supabase
-      .from('profiles')
-      .update(updates)
-      .eq('id', state.currentUser.id);
-
-    if (!error) {
-      setState(prev => ({
-        ...prev,
-        currentUser: { ...prev.currentUser!, ...data }
-      }));
-    }
+    const { error } = await supabase.from('profiles').update(updates).eq('id', state.currentUser.id);
+    if (!error) setState(prev => ({ ...prev, currentUser: { ...prev.currentUser!, ...data } }));
   };
 
   const addCard = (cardData: Omit<Card, 'id'>) => {
     if (!state.currentUser) return;
     const newCard: Card = { ...cardData, id: Math.random().toString(36).substr(2, 9) };
-    setState(prev => ({
-      ...prev,
-      currentUser: {
-        ...prev.currentUser!,
-        cards: [...prev.currentUser!.cards, newCard]
-      }
-    }));
+    setState(prev => ({ ...prev, currentUser: { ...prev.currentUser!, cards: [...prev.currentUser!.cards, newCard] } }));
   };
 
   const createTask = async (category: string, description: string, photo?: string, location?: { lat: number, lng: number }, budget?: number) => {
     if (!state.currentUser) return;
-    const { error } = await supabase.from('tasks').insert({
-      user_id: state.currentUser.id,
-      category,
-      description,
-      photo,
-      location,
-      budget,
-      status: 'pending'
-    });
-    if (error) {
-      console.error("CREATE TASK ERROR:", error);
-      throw error;
+    try {
+      const { error } = await supabase.from('tasks').insert({ user_id: state.currentUser.id, category, description, photo, location, budget, status: 'pending' });
+      if (error) throw error;
+      await fetchTasks();
+    } catch (e) {
+      console.error("Error creating task:", e);
+      throw e;
     }
-    fetchTasks();
   };
 
   const applyToTask = async (taskId: string) => {
-    if (!state.currentUser) {
-      console.warn("Cannot apply to task: No user logged in.");
-      return;
+    if (!state.currentUser) return;
+    try {
+      const { data: task } = await supabase.from('tasks').select('user_id, category').eq('id', taskId).single();
+      const { error } = await supabase.from('tasks').update({ pro_id: state.currentUser.id, status: 'accepted' }).eq('id', taskId);
+      if (error) throw error;
+
+      if (task) {
+        await supabase.from('notifications').insert({
+          user_id: task.user_id,
+          title: "¡Profesional asignado!",
+          message: `Un profesional se ha postulado para tu tarea de ${task.category}.`
+        });
+      }
+
+      await fetchTasks();
+    } catch (e) {
+      console.error("Error applying to task:", e);
+      throw e;
     }
-    console.log("Applying to task:", taskId, "as PRO:", state.currentUser.id);
-
-    // Using .select() after update to verify if the row was actually updated (RLS check)
-    const { data, error } = await supabase
-      .from('tasks')
-      .update({ pro_id: state.currentUser.id, status: 'accepted' })
-      .eq('id', taskId)
-      .select();
-
-    if (error) {
-      console.error("Error applying to task:", error.message);
-      throw error;
-    }
-
-    if (!data || data.length === 0) {
-      console.error("Update failed: No rows were affected. This usually means a RLS policy is blocking the update for this specific row.");
-      throw new Error("No tienes permisos para aceptar esta tarea o la tarea ya no está disponible.");
-    }
-
-    console.log("Successfully updated task in DB:", data[0]);
-    await fetchTasks();
   };
 
   const getChatForPro = async (proId: string): Promise<Chat> => {
     if (!state.currentUser) throw new Error("Auth required");
-    const existingChat = state.chats.find(c =>
-      c.participants.includes(state.currentUser!.id) && c.participants.includes(proId)
-    );
+    const existingChat = state.chats.find(c => c.participants.includes(state.currentUser!.id) && c.participants.includes(proId));
     if (existingChat) return existingChat;
-
-    const { data, error } = await supabase
-      .from('chats')
-      .insert({ participants: [state.currentUser.id, proId] })
-      .select()
-      .single();
-
+    const { data, error } = await supabase.from('chats').insert({ participants: [state.currentUser.id, proId] }).select().single();
     if (error) throw error;
     const newChat: Chat = { id: data.id, participants: data.participants, messages: [] };
     setState(prev => ({ ...prev, chats: [...prev.chats, newChat] }));
@@ -649,172 +492,96 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const sendMessage = async (chatId: string, text: string) => {
     if (!state.currentUser) return;
-    console.log(`[AppContext] Sending message to chat ${chatId} as ${state.currentUser.id}: ${text}`);
-    const { error } = await supabase.from('messages').insert({
-      chat_id: chatId,
-      sender_id: state.currentUser.id,
-      text
-    });
-    if (error) {
-      console.error("[AppContext] FAILED to send message:", error.message, error.details);
-      throw error;
-    }
-    console.log("[AppContext] Message sent successfully, refreshing chats...");
-    fetchChats();
+    const { error } = await supabase.from('messages').insert({ chat_id: chatId, sender_id: state.currentUser.id, text });
+    if (!error) fetchChats();
   };
 
   const createPaymentPreference = async (taskId: string, amount: number, description: string): Promise<string> => {
     if (!state.currentUser) throw new Error("Auth required");
-
-    // UI/Legal Banner Logic
-    const protectionFee = amount * 0.05;
-    const totalAmount = amount + protectionFee;
-
-    console.log("Creating escrow payment preference for task:", taskId, "Amount:", amount, "Protection Fee:", protectionFee);
-
-    const { data, error } = await supabase.functions.invoke('mercadopago-payment', {
-      body: {
-        taskId,
-        amount: totalAmount,
-        description: `${description} (Incluye Costo de Protección y Garantía)`,
-        userEmail: state.currentUser.email,
-        isEscrow: true
-      }
-    });
-
-    if (error) {
-      console.error("Supabase function invoke error:", error);
-      throw new Error("Error de conexión con la función de pago.");
-    }
-
-    if (data?.error) {
-      console.error("Mercado Pago API Error:", data);
-      throw new Error("Mercado Pago dice: " + data.error);
-    }
-
-    if (!data?.init_point) {
-      throw new Error("No se pudo obtener el link de pago.");
-    }
+    const totalAmount = amount + (amount * 0.05);
+    const { data, error } = await supabase.functions.invoke('mercadopago-payment', { body: { taskId, amount: totalAmount, description: `${description} (Incluye Costo de Protección y Garantía)`, userEmail: state.currentUser.email, isEscrow: true } });
+    if (error || !data?.init_point) throw new Error("Error de pago.");
     return data.init_point;
   };
 
   const finalizeTask = async (taskId: string) => {
-    console.log("[AppContext] Finalizing task:", taskId);
-    // 1. Update task status to paid
-    const { error: taskError } = await supabase
-      .from('tasks')
-      .update({ status: 'paid' })
-      .eq('id', taskId);
-    if (taskError) throw taskError;
+    try {
+      const { data: task } = await supabase.from('tasks').select('pro_id, category').eq('id', taskId).single();
+      const { error } = await supabase.from('tasks').update({ status: 'completed' }).eq('id', taskId);
+      if (error) throw error;
 
-    // 2. Fetch the transaction associated with this task
-    const { data: tx, error: txError } = await supabase
-      .from('transactions')
-      .select('*')
-      .eq('task_id', taskId)
-      .eq('type', 'payment')
-      .single();
-
-    if (tx) {
-      // Update transaction status to released
-      await supabase.from('transactions').update({ status: 'released' }).eq('id', tx.id);
-
-      let amountToCredit = tx.net_amount;
-
-      // --- Debt Recovery Logic ---
-      const { data: debts } = await supabase
-        .from('debt_history')
-        .select('*')
-        .eq('pro_id', tx.pro_id)
-        .gt('remaining_amount', 0)
-        .order('created_at', { ascending: true });
-
-      if (debts && debts.length > 0) {
-        console.log("[AppContext] Found debts for PRO. Applying recovery...");
-        for (const debt of debts) {
-          if (amountToCredit <= 0) break;
-
-          const settlement = Math.min(amountToCredit, debt.remaining_amount);
-          amountToCredit -= settlement;
-
-          const newRemaining = debt.remaining_amount - settlement;
-          await supabase.from('debt_history').update({
-            remaining_amount: newRemaining,
-            settled_at: newRemaining === 0 ? new Date().toISOString() : null
-          }).eq('id', debt.id);
-
-          console.log(`[AppContext] Debt ${debt.id} partially/fully settled with $${settlement}`);
-        }
+      if (task && task.pro_id) {
+        await supabase.from('notifications').insert({
+          user_id: task.pro_id,
+          title: "¡Trabajo Finalizado!",
+          message: `El cliente ha finalizado la tarea de ${task.category}. El pago se liberará pronto.`
+        });
       }
 
-      // Update PRO balance (what's left after debt recovery)
-      const { data: proProfile } = await supabase.from('profiles').select('current_balance').eq('id', tx.pro_id).single();
-      const newBalance = (proProfile?.current_balance || 0) + amountToCredit;
-
-      await supabase.from('profiles').update({
-        current_balance: newBalance,
-        completed_jobs: supabase.rpc('increment', { row_id: tx.pro_id, column_name: 'completed_jobs' })
-      }).eq('id', tx.pro_id);
+      await fetchTasks();
+    } catch (e) {
+      console.error("Error finalizing task:", e);
+      throw e;
     }
-    fetchTasks();
   };
 
   const resolveDispute = async (disputeId: string, resolution: 'pro' | 'user') => {
-    console.log("[AppContext] Resolving dispute:", disputeId, "Resolution:", resolution);
-    const { data: dispute } = await supabase.from('disputes').select('*').eq('id', disputeId).single();
-    if (!dispute) return;
-
-    if (resolution === 'user') {
-      // PRO abandoned/failed. Create DEBT.
-      const { data: tx } = await supabase.from('transactions').select('*').eq('task_id', dispute.task_id).single();
-      if (tx) {
-        // Create debt record
-        await supabase.from('debt_history').insert({
-          pro_id: dispute.pro_id,
-          user_id: dispute.user_id,
-          amount: tx.amount,
-          remaining_amount: tx.amount,
-          source_dispute_id: dispute.id
-        });
-
-        // Negative balance on PRO
-        const { data: pro } = await supabase.from('profiles').select('current_balance').eq('id', dispute.pro_id).single();
-        await supabase.from('profiles').update({
-          current_balance: (pro?.current_balance || 0) - tx.amount,
-          last_debt_date: new Date().toISOString()
-        }).eq('id', dispute.pro_id);
-      }
-    }
-
-    await supabase.from('disputes').update({ status: `resolved_${resolution}`, resolved_at: new Date().toISOString() }).eq('id', dispute.id);
+    await supabase.from('disputes').update({ status: `resolved_${resolution}`, resolved_at: new Date().toISOString() }).eq('id', disputeId);
   };
 
   const checkAccountStatus = async () => {
     if (!state.currentUser || state.currentUser.role !== 'pro') return;
-
-    console.log("[AppContext] Checking account health for PRO:", state.currentUser.id);
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('current_balance, dispute_count, last_debt_date')
-      .eq('id', state.currentUser.id)
-      .single();
-
+    const { data: profile } = await supabase.from('profiles').select('current_balance, dispute_count, last_debt_date').eq('id', state.currentUser.id).single();
     if (profile) {
-      let shouldSuspend = false;
-      const daysWithDebt = profile.last_debt_date ?
-        (Number(new Date()) - Number(new Date(profile.last_debt_date))) / (1000 * 60 * 60 * 24) : 0;
-
-      // AUTO-BAN RULES:
-      // 1. More than 2 unresolved claims
-      if (profile.dispute_count >= 2) shouldSuspend = true;
-      // 2. Debt older than 30 days
+      let shouldSuspend = profile.dispute_count >= 2;
+      const daysWithDebt = profile.last_debt_date ? (Number(new Date()) - Number(new Date(profile.last_debt_date))) / (1000 * 60 * 60 * 24) : 0;
       if (profile.current_balance < 0 && daysWithDebt > 30) shouldSuspend = true;
-
       if (shouldSuspend) {
-        console.warn("[AppContext] !!! ACCOUNT SUSPENDED !!!");
         await supabase.from('profiles').update({ is_suspended: true }).eq('id', state.currentUser.id);
         setState(prev => ({ ...prev, currentUser: { ...prev.currentUser!, isSuspended: true } }));
       }
+    }
+  };
+
+  const rateProfessional = async (taskId: string, proId: string, rating: number, comment: string) => {
+    if (!state.currentUser) return;
+    try {
+      const { error: revError } = await supabase.from('reviews').insert({ task_id: taskId, reviewer_id: state.currentUser.id, reviewed_id: proId, rating, comment });
+      if (revError) throw revError;
+
+      await supabase.from('notifications').insert({ user_id: proId, title: "¡Nueva Reseña!", message: `Has recibido un rating de ${rating} estrellas.` });
+
+      const { data: reviews } = await supabase.from('reviews').select('rating').eq('reviewed_id', proId);
+      if (reviews && reviews.length > 0) {
+        const newRating = reviews.reduce((acc, curr) => acc + curr.rating, 0) / reviews.length;
+        await supabase.from('profiles').update({ rating: newRating, reviews_count: reviews.length }).eq('id', proId);
+      }
+      await fetchTasks(); // Refresh to hide button
+      await fetchReviews(proId); // Refresh public view if needed
+    } catch (e) {
+      console.error("Error rating professional:", e);
+      throw e;
+    }
+  };
+
+  const rateUser = async (taskId: string, userId: string, rating: number, comment: string) => {
+    if (!state.currentUser) return;
+    try {
+      const { error: revError } = await supabase.from('reviews').insert({ task_id: taskId, reviewer_id: state.currentUser.id, reviewed_id: userId, rating, comment });
+      if (revError) throw revError;
+
+      await supabase.from('notifications').insert({ user_id: userId, title: "¡PRO te calificó!", message: `El profesional te ha calificado con ${rating} estrellas.` });
+
+      const { data: reviews } = await supabase.from('reviews').select('rating').eq('reviewed_id', userId);
+      if (reviews && reviews.length > 0) {
+        const newRating = reviews.reduce((acc, curr) => acc + curr.rating, 0) / reviews.length;
+        await supabase.from('profiles').update({ rating: newRating, reviews_count: reviews.length }).eq('id', userId);
+      }
+      await fetchTasks(); // Refresh to hide button
+      await fetchReviews(userId); // Refresh public view if needed
+    } catch (e) {
+      console.error("Error rating user:", e);
+      throw e;
     }
   };
 
@@ -822,7 +589,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     <AppContext.Provider value={{
       state, login, register, logout, updateUser, toggleProMode,
       createTask, applyToTask, sendMessage, getChatForPro, fetchNotifications,
-      createPaymentPreference, finalizeTask, resolveDispute, checkAccountStatus
+      createPaymentPreference, finalizeTask, resolveDispute, checkAccountStatus,
+      fetchTransactions, rateProfessional, fetchReviews, rateUser,
+      markNotificationsAsRead, markNotificationAsRead
     }}>
       {children}
     </AppContext.Provider>
@@ -834,3 +603,5 @@ export const useApp = () => {
   if (!context) throw new Error('useApp must be used within AppProvider');
   return context;
 };
+
+export default AppContext;

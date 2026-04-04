@@ -30,7 +30,7 @@ const Privacy: React.FC = () => {
                         Datos que Recolectamos
                     </h2>
                     <ul className="list-disc ml-4 text-sm text-gray-600 dark:text-gray-400 space-y-2">
-                        <li>**Información de Registro:** Nombre, correo electrónico, DNI (opcional para usuarios, requerido para profesionales) y foto de perfil.</li>
+                        <li>**Información de Registro:** Nombre, correo electrónico, DNI y foto de perfil.</li>
                         <li>**Ubicación:** Recolectamos datos de geolocalización para mostrarte profesionales cercanos y permitir la creación de tareas en el mapa.</li>
                         <li>**Mensajería:** Almacenamos tus mensajes en el chat para permitir la comunicación entre usuarios y profesionales sobre los servicios solicitados.</li>
                         <li>**Información de Pagos:** No almacenamos datos de tarjetas directamente. Los pagos se procesan de forma segura a través de **Mercado Pago**.</li>
@@ -48,7 +48,6 @@ const Privacy: React.FC = () => {
                     <ul className="list-disc ml-4 text-sm text-gray-600 dark:text-gray-400 space-y-2 mt-2">
                         <li>Conectar clientes con profesionales calificados.</li>
                         <li>Facilitar la gestión de pagos y seguimiento de tareas.</li>
-                        <li>Brindar soporte técnico a través de nuestro asistente con IA.</li>
                         <li>Enviar notificaciones importantes sobre el estado de tus pedidos.</li>
                     </ul>
                 </section>

@@ -13,6 +13,7 @@ const Login: React.FC = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
+  const [dni, setDni] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -37,12 +38,17 @@ const Login: React.FC = () => {
       return;
     }
 
+    if (isRegistering && !dni.trim()) {
+      setError("El DNI es obligatorio para registrarte");
+      return;
+    }
+
     setError(null);
     setLoading(true);
 
     try {
       if (isRegistering) {
-        await register(cleanEmail, cleanPassword, role, name.trim());
+        await register(cleanEmail, cleanPassword, role, name.trim(), dni.trim());
         setError("¡Registro exitoso! Por favor, verifica tu email antes de ingresar.");
         setIsRegistering(false);
       } else {
@@ -78,13 +84,22 @@ const Login: React.FC = () => {
 
         <div className="space-y-4">
           {isRegistering && (
-            <input
-              type="text"
-              placeholder="Nombre Completo"
-              className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl p-4 focus:ring-2 focus:ring-primary"
-              value={name}
-              onChange={e => setName(e.target.value)}
-            />
+            <>
+              <input
+                type="text"
+                placeholder="Nombre Completo"
+                className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl p-4 focus:ring-2 focus:ring-primary"
+                value={name}
+                onChange={e => setName(e.target.value)}
+              />
+              <input
+                type="text"
+                placeholder="DNI (Número de documento)"
+                className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl p-4 focus:ring-2 focus:ring-primary"
+                value={dni}
+                onChange={e => setDni(e.target.value)}
+              />
+            </>
           )}
 
           <input

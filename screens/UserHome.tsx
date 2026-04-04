@@ -7,22 +7,32 @@ import BottomNav from '../components/BottomNav';
 import ProDashboard from './ProDashboard';
 
 const CATEGORIES = [
-  { id: 'electricidad', name: 'Electricidad', icon: 'bolt', color: 'bg-yellow-100 text-yellow-600' },
-  { id: 'plomeria', name: 'Plomería', icon: 'water_drop', color: 'bg-blue-100 text-blue-600' },
-  { id: 'gas', name: 'Gas', icon: 'local_fire_department', color: 'bg-orange-100 text-orange-600' },
-  { id: 'aire-acondicionado', name: 'Aire Acond', icon: 'ac_unit', color: 'bg-cyan-100 text-cyan-600' },
-  { id: 'carpinteria', name: 'Carpintería', icon: 'handyman', color: 'bg-amber-100 text-amber-600' },
-  { id: 'herreria', name: 'Herrería', icon: 'hardware', color: 'bg-slate-100 text-slate-600' },
-  { id: 'pintura', name: 'Pintura', icon: 'format_paint', color: 'bg-red-100 text-red-600' },
-  { id: 'limpieza', name: 'Limpieza', icon: 'mop', color: 'bg-purple-100 text-purple-600' },
-  { id: 'jardineria', name: 'Jardinería', icon: 'yard', color: 'bg-green-100 text-green-600' },
-  { id: 'electronica', name: 'Electrónica', icon: 'memory', color: 'bg-emerald-100 text-emerald-600' },
-  { id: 'mas', name: 'Más', icon: 'more_horiz', color: 'bg-gray-100 text-gray-600' }
+  { id: 'Electricidad', name: 'Electricidad', icon: 'bolt', color: 'bg-yellow-100 text-yellow-600' },
+  { id: 'Plomería', name: 'Plomería', icon: 'water_drop', color: 'bg-blue-100 text-blue-600' },
+  { id: 'Gas', name: 'Gas', icon: 'local_fire_department', color: 'bg-orange-100 text-orange-600' },
+  { id: 'Aire Acondicionado', name: 'Aire Acond', icon: 'ac_unit', color: 'bg-cyan-100 text-cyan-600' },
+  { id: 'Carpintería', name: 'Carpintería', icon: 'handyman', color: 'bg-amber-100 text-amber-600' },
+  { id: 'Herrería', name: 'Herrería', icon: 'hardware', color: 'bg-slate-100 text-slate-600' },
+  { id: 'Pintura', name: 'Pintura', icon: 'format_paint', color: 'bg-red-100 text-red-600' },
+  { id: 'Limpieza', name: 'Limpieza', icon: 'mop', color: 'bg-purple-100 text-purple-600' },
+  { id: 'Jardinería', name: 'Jardinería', icon: 'yard', color: 'bg-green-100 text-green-600' },
+  { id: 'Cerrajería', name: 'Cerrajería', icon: 'lock', color: 'bg-stone-100 text-stone-600' },
+  { id: 'Mudanzas', name: 'Mudanzas', icon: 'local_shipping', color: 'bg-indigo-100 text-indigo-600' },
+  { id: 'Electrónica', name: 'Electrónica', icon: 'memory', color: 'bg-emerald-100 text-emerald-600' }
 ];
 
 const UserHome: React.FC = () => {
   const navigate = useNavigate();
   const { state } = useApp();
+
+  const [showTransparency, setShowTransparency] = React.useState(() => {
+    return !sessionStorage.getItem('transparency_accepted_user');
+  });
+
+  const handleAcceptTransparency = () => {
+    sessionStorage.setItem('transparency_accepted_user', 'true');
+    setShowTransparency(false);
+  };
 
   if (state.isProMode) return <ProDashboard />;
 
@@ -64,7 +74,7 @@ const UserHome: React.FC = () => {
             <button className="text-primary text-xs font-bold" onClick={() => navigate('/categories')}>Ver todo</button>
           </div>
           <div className="grid grid-cols-4 gap-3">
-            {CATEGORIES.slice(0, 8).map((cat) => (
+            {CATEGORIES.slice(0, 12).map((cat) => (
               <button
                 key={cat.id}
                 onClick={() => navigate(`/category/${cat.id}`)}
@@ -122,6 +132,28 @@ const UserHome: React.FC = () => {
       </main>
 
       <BottomNav />
+
+      {/* Transparency Modal */}
+      {showTransparency && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white dark:bg-surface-dark w-full max-w-sm rounded-[32px] p-8 shadow-2xl animate-in fade-in zoom-in duration-300">
+            <div className="size-16 bg-primary/10 rounded-full flex items-center justify-center mb-6 mx-auto">
+              <span className="material-symbols-outlined text-3xl text-primary">gavel</span>
+            </div>
+            <h2 className="text-xl font-bold text-center mb-4">Transparencia Arreglados</h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 text-center leading-relaxed mb-8">
+              Arreglados es un facilitador tecnológico que solo facilita el contacto.
+              <span className="block mt-2 font-bold text-primary">No somos empleadores ni contratistas de los profesionales.</span>
+            </p>
+            <button
+              onClick={handleAcceptTransparency}
+              className="w-full bg-primary text-white font-bold py-4 rounded-2xl shadow-lg shadow-primary/20 active:scale-95 transition-all"
+            >
+              Entendido y Aceptar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

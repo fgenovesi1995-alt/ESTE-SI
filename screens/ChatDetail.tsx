@@ -94,9 +94,9 @@ const ChatDetail: React.FC = () => {
           <h2 className="font-bold text-sm leading-none mb-1 text-slate-900 dark:text-white">{otherPerson.name}</h2>
           <p className="text-[10px] text-gray-500 font-medium font-semibold">En línea ahora</p>
         </div>
-        <button className="p-2 text-primary">
-          <span className="material-symbols-outlined">call</span>
-        </button>
+        <div className="size-10 flex items-center justify-center">
+          {/* Call disabled */}
+        </div>
       </header>
 
       {/* Messages */}

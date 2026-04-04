@@ -68,7 +68,9 @@ const ProProfile: React.FC = () => {
               </div>
               <div>
                 <p className="text-xs text-gray-500">Ubicación</p>
-                <p className="text-sm font-semibold">{pro.location}</p>
+                <p className="text-sm font-semibold">
+                  {typeof pro.location === 'object' ? 'Cerca de tu zona' : pro.location}
+                </p>
               </div>
             </div>
 

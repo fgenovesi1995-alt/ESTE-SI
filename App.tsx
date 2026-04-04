@@ -9,6 +9,7 @@ import Login from './screens/Login';
 import UserHome from './screens/UserHome';
 import ChatDetail from './screens/ChatDetail';
 import ProProfile from './screens/ProProfile';
+import PublicProfile from './screens/PublicProfile';
 import ProfileSettings from './screens/ProfileSettings';
 import CreateTask from './screens/CreateTask';
 import MapView from './screens/MapView';
@@ -51,6 +52,7 @@ const AppRoutes: React.FC = () => {
         <Route path="/home" element={<ProtectedRoute><UserHome /></ProtectedRoute>} />
         <Route path="/chat/:id" element={<ProtectedRoute><ChatDetail /></ProtectedRoute>} />
         <Route path="/pro/:id" element={<ProtectedRoute><ProProfile /></ProtectedRoute>} />
+        <Route path="/profile/:id" element={<ProtectedRoute><PublicProfile /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><ProfileSettings /></ProtectedRoute>} />
         <Route path="/create-task" element={<ProtectedRoute><CreateTask /></ProtectedRoute>} />
         <Route path="/tasks" element={<ProtectedRoute><TasksHistory /></ProtectedRoute>} />

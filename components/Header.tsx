@@ -5,7 +5,7 @@ import { useApp } from '../context/AppContext';
 
 const Header: React.FC = () => {
   const navigate = useNavigate();
-  const { state, markNotificationsAsRead } = useApp();
+  const { state, markNotificationsAsRead, markNotificationAsRead } = useApp();
   const [showNotif, setShowNotif] = useState(false);
 
   return (
@@ -56,10 +56,28 @@ const Header: React.FC = () => {
               ) : (
                 <div className="flex flex-col gap-3 max-h-60 overflow-y-auto pr-1">
                   {state.notifications.map(n => (
-                    <div key={n.id} className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
-                      <p className="text-xs font-bold text-primary mb-1">{n.title}</p>
+                    <button
+                      key={n.id}
+                      onClick={() => {
+                        markNotificationAsRead(n.id);
+                        setShowNotif(false);
+                        const title = n.title.toLowerCase();
+                        if (title.includes('reseña') || title.includes('rating') || title.includes('calificación')) {
+                          navigate('/profile'); // Own profile to see reviews
+                        } else if (title.includes('trabajo') || title.includes('pago') || title.includes('escrow')) {
+                          navigate('/tasks');
+                        } else if (title.includes('mensaje') || title.includes('chat')) {
+                          navigate('/home'); // Or chat list if available
+                        }
+                      }}
+                      className={`p-3 rounded-xl text-left transition-colors ${n.read ? 'bg-gray-50 dark:bg-gray-800/30 opacity-60' : 'bg-primary/5 dark:bg-primary/10 border border-primary/10'}`}
+                    >
+                      <p className="text-xs font-bold text-primary mb-1 flex items-center justify-between">
+                        {n.title}
+                        {!n.read && <span className="size-1.5 bg-primary rounded-full"></span>}
+                      </p>
                       <p className="text-[10px] text-gray-600 dark:text-gray-400 leading-tight">{n.message}</p>
-                    </div>
+                    </button>
                   ))}
                 </div>
               )}

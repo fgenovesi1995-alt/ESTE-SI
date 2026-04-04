@@ -29,6 +29,8 @@ export interface User {
   criminalRecordUrl?: string;
   cbuAlias?: string;
   profession?: string;
+  rating?: number;
+  reviewsCount?: number;
 }
 
 export interface Professional {
@@ -63,6 +65,7 @@ export interface Task {
   };
   status: 'pending' | 'accepted' | 'completed' | 'paid' | 'escrow' | 'disputed';
   createdAt: string;
+  reviews: Review[];
 }
 
 export interface Message {
@@ -88,6 +91,29 @@ export interface InAppNotification {
   createdAt: string;
 }
 
+export interface Transaction {
+  id: string;
+  taskId?: string;
+  userId?: string;
+  proId?: string;
+  amount: number;
+  feeAmount: number;
+  netAmount: number;
+  type: string;
+  status: string;
+  createdAt: string;
+}
+
+export interface Review {
+  id: string;
+  taskId: string;
+  reviewerId: string;
+  reviewedId: string;
+  rating: number;
+  comment: string;
+  createdAt: string;
+}
+
 export interface AppState {
   currentUser: User | null;
   tasks: Task[];
@@ -95,6 +121,8 @@ export interface AppState {
   professionals: Professional[];
   profiles: User[];
   notifications: InAppNotification[];
+  transactions: Transaction[];
+  reviews: Review[];
   isProMode: boolean;
   isInitialized: boolean;
 }
