@@ -26,9 +26,17 @@ const TasksHistory: React.FC = () => {
   const reviewInputRef = React.useRef<HTMLTextAreaElement>(null);
 
   const handlePayment = async (task: any) => {
+    // For web, we open a window immediately to avoid popup blockers
+    let win: Window | null = null;
+    if (!Capacitor.isNativePlatform()) {
+      win = window.open('', '_blank');
+      if (win) win.document.write('Cargando pago...');
+    }
+
     try {
       const amount = 500;
       const url = await createPaymentPreference(task.id, amount, `Pago por servicio: ${task.category}`);
+
       if (Capacitor.isNativePlatform()) {
         const listener = await Browser.addListener('browserFinished', () => {
           fetchTasks();
@@ -36,7 +44,13 @@ const TasksHistory: React.FC = () => {
         });
         await Browser.open({ url, windowName: '_blank' });
       } else {
-        window.open(url, '_blank');
+        if (win) {
+          win.location.href = url;
+        } else {
+          // Fallback if window creation failed initially
+          window.location.href = url;
+        }
+
         const handleFocus = () => {
           fetchTasks();
           window.removeEventListener('focus', handleFocus);
@@ -44,7 +58,8 @@ const TasksHistory: React.FC = () => {
         window.addEventListener('focus', handleFocus);
       }
     } catch (err: any) {
-      alert(err.message);
+      if (win) win.close();
+      alert(err.message || 'Error al iniciar el pago');
     }
   };
 
